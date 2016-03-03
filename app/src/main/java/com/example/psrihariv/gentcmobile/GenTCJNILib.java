@@ -10,7 +10,8 @@ public class GenTCJNILib {
         System.loadLibrary("GenTCjni");
     }
 
-    public static native void init();
-    public static native void Render();
+    public static native void init(String path);
+    public static native void draw();
+    public static native void resize(int width, int height);
 
 }

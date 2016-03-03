@@ -73,19 +73,23 @@ public:
     void initializeTexture();
     void initializeCompressedTexture();
     void loadShaders(const char *VertexShader, const char *FragmentShader);
-    void loadTextureDataJPG(const char *imgPath);
+    void loadTextureDataJPG(int img_num);
     void loadTextureDataPBO(const char *imgPath);
+    void resize(int w, int h);
+    void draw();
 
-
+    GLint posLoc;
+    GLint uvLoc;
+    GLint texLoc;
     GLuint m_ProgramId; // program ID returned after compiling the shaders
     GLuint m_VertexBuffer; // VertexBuffer ID
     GLuint m_UVBuffer;// UV Buffer ID
     GLuint m_NormalBuffer;//Normal Buffer ID
     GLuint m_IndexBuffer;// Index Buffer ID
     GLuint m_TextureId;// Texture Id after GLgentextures
-    GLuint m_VertexAarryId; // Vertex array ID
+    GLuint m_VertexArrayId; // Vertex array ID
     GLbyte *m_TextureDataPtr;// Texture data pointer, data loaded from a file generally
-    GLuint m_pboId[2]; // Pixel buffer objects Id
+    GLuint m_PboId[2]; // Pixel buffer objects Id
     uint32_t m_NumIndices; // number of indices
     uint32_t m_TextureNumber; // number of the current Texture
     char m_TexturePath[256];

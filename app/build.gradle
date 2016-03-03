@@ -32,6 +32,9 @@ model {
     }
 
     android.productFlavors {
+        create("arm"){
+            ndk.abiFilters.add("armeabi")
+        }
         create("arm7") {
             ndk.abiFilters.add("armeabi-v7a")
         }
