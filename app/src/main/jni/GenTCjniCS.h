@@ -1,9 +1,9 @@
 //
-// Created by psrihariv on 3/1/2016.
+// Created by psrihariv on 3/4/2016.
 //
 
-#ifndef __GENTCMOBILE_GENTCJNI_H
-#define __GENTCMOBILE_GENTCJNI_H
+#ifndef GENTCMOBILE_GENTCJNICS_H
+#define GENTCMOBILE_GENTCJNICS_H
 
 #include <android/log.h>
 #include <math.h>
@@ -12,9 +12,11 @@
 
 
 
-#include <GLES3/gl3.h>
-#include <EGL/egl.h> /// chance of error
+#include <GLES3/gl31.h>
+#include <EGL/egl.h>
 #include <vector>
+
+
 
 #define DEBUG
 
@@ -56,23 +58,19 @@ static const char* getGLErrString(GLenum err){
 #define CHECK_GL(fn, ...) do { fn(__VA__ARGS__); } while(0)
 #endif
 
-typedef struct _Vertex {
 
-    GLfloat pos[3];
-    GLfloat uv[2];
-}Vertex;
-
-class Renderer{
+class RendererCS{
 
 public:
-    ~Renderer();
+    ~RendererCS();
     void render();
     void init(const char *path);
-    Renderer();
+    RendererCS();
 
     void initializeTexture();
     void initializeCompressedTexture();
     void loadShaders(const char *VertexShader, const char *FragmentShader);
+    void loadComputeShader(const char *ComputeShader);
     void loadTextureDataJPG(int img_num);
     void loadTextureDataPBO(const char *imgPath);
     void resize(int w, int h);
@@ -81,12 +79,16 @@ public:
     GLint posLoc;
     GLint uvLoc;
     GLint texLoc;
+    GLint texLocInCS;
+    GLint texLocOutCS;
     GLuint m_ProgramId; // program ID returned after compiling the shaders
+    GLuint m_ComputeId;
     GLuint m_VertexBuffer; // VertexBuffer ID
     GLuint m_UVBuffer;// UV Buffer ID
     GLuint m_NormalBuffer;//Normal Buffer ID
     GLuint m_IndexBuffer;// Index Buffer ID
     GLuint m_TextureId;// Texture Id after GLgentextures
+    GLuint m_TextureId2;
     GLuint m_VertexArrayId; // Vertex array ID
     GLbyte *m_TextureDataPtr;// Texture data pointer, data loaded from a file generally
     GLuint m_PboId[2]; // Pixel buffer objects Id
@@ -95,8 +97,6 @@ public:
     char m_TexturePath[256];
     const EGLContext m_EglContext;
 
-
-
-
 };
-#endif //GENTCMOBILE_GENTCJNI_H
+
+#endif //GENTCMOBILE_GENTCJNICS_H
