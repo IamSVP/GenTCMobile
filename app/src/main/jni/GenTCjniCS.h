@@ -15,7 +15,12 @@
 #include <GLES3/gl31.h>
 #include <EGL/egl.h>
 #include <vector>
-
+#include <chrono>
+#include <ctime>
+#include "ObjLoader/objloader.hpp"
+#include "ObjLoader/vboindexer.hpp"
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
 
 #define DEBUG
@@ -36,6 +41,8 @@ static const char* getGLErrString(GLenum err){
         case GL_INVALID_ENUM: errString = "Invalid enum"; break;
         case GL_INVALID_VALUE: errString = "Invalid value"; break;
         case GL_INVALID_OPERATION: errString = "Invalid operation"; break;
+        case GL_INVALID_FRAMEBUFFER_OPERATION: errString = "Invalid Frame Buffer Operation"; break;
+        case GL_OUT_OF_MEMORY: errString = "Out of Memory Operation"; break;
     }
     return errString;
 }
@@ -68,6 +75,8 @@ public:
     RendererCS();
 
     void initializeTexture();
+    void initializeScene();
+    void intializeShaderBuffers();
     void initializeCompressedTexture();
     void loadShaders(const char *VertexShader, const char *FragmentShader);
     void loadComputeShader(const char *ComputeShader);
@@ -81,6 +90,7 @@ public:
     GLint texLoc;
     GLint texLocInCS;
     GLint texLocOutCS;
+    GLint matrixID, viewMatrixID, modelMatrixID;
     GLuint m_ProgramId; // program ID returned after compiling the shaders
     GLuint m_ComputeId;
     GLuint m_VertexBuffer; // VertexBuffer ID
@@ -89,12 +99,20 @@ public:
     GLuint m_IndexBuffer;// Index Buffer ID
     GLuint m_TextureId;// Texture Id after GLgentextures
     GLuint m_TextureId2;
+    GLuint m_ssbo;
     GLuint m_VertexArrayId; // Vertex array ID
     GLbyte *m_TextureDataPtr;// Texture data pointer, data loaded from a file generally
     GLuint m_PboId[2]; // Pixel buffer objects Id
     uint32_t m_NumIndices; // number of indices
     uint32_t m_TextureNumber; // number of the current Texture
+    glm::mat4 m_Projection;
+    glm::mat4 m_View;
+    glm::mat4 m_MVP;
+
+    float scale[100];
     char m_TexturePath[256];
+    char m_ObjPath[256];
+
     const EGLContext m_EglContext;
 
 };

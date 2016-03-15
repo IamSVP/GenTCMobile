@@ -10,6 +10,8 @@ import javax.microedition.khronos.opengles.GL10;
 /**
  * Created by psrihariv on 3/1/2016.
  */
+
+
 public class GenTCView extends GLSurfaceView {
 
     private static final String TAG = "GenTcView";

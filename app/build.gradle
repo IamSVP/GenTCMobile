@@ -17,13 +17,31 @@ model {
     }
     android.ndk {
         moduleName  = "GenTCjni"
-        cppFlags.addAll(["-Werror", "-fno-rtti", "-fno-exceptions"])
+        cppFlags.addAll(["-std=c++11", "-Werror", "-fno-rtti", "-fno-exceptions"])
+        cppFlags.addAll(["-I${file("src/main/jni/ObjLoader")}".toString() ])
+
+
+
+
+
         CFlags.add("-Werror")
         ldLibs.addAll(["log","GLESv3", "EGL"])
 
-        stl         = "stlport_static"
+        stl         = "gnustl_static"
 
     }
+    android.sources {
+        main {
+            jni {
+                source{
+
+                    srcDirs = [ 'src/main/jni', 'src/main/jni/ObjLoader']
+                }
+
+            }
+        }
+    }
+
     android.buildTypes {
         release {
             minifyEnabled = false

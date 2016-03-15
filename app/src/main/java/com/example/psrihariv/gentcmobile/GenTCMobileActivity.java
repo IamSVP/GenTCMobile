@@ -18,14 +18,14 @@ public class GenTCMobileActivity extends Activity {
         super.onCreate(icicle);
         mView = new GenTCView(getApplication());
 
-        folder = new File(Environment.getExternalStorageDirectory().toString()+"/Textures");
+        folder = new File(Environment.getExternalStorageDirectory().toString()+"/GenTcAssets");
         Log.d(Environment.getExternalStorageDirectory().getPath(), "blah");
         if(folder.exists() && folder.isDirectory()) {
             //requestPermissions(new String[]{android.Manifest.permission.READ_EXTERNAL_STORAGE}, 123);
             Log.d(folder.getPath(),"Path found blah");
             File f[] = folder.listFiles();
             if(f!=null)
-                Log.d("filename", f[20].getAbsolutePath());
+                Log.d("filename", f[0].getAbsolutePath());
         }
         else{
 
