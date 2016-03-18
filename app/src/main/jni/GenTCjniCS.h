@@ -21,6 +21,7 @@
 #include "ObjLoader/vboindexer.hpp"
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtx/transform.hpp"
 
 
 #define DEBUG
@@ -79,12 +80,12 @@ public:
     void intializeShaderBuffers();
     void initializeCompressedTexture();
     void loadShaders(const char *VertexShader, const char *FragmentShader);
-    void loadComputeShader(const char *ComputeShader);
+    void loadComputeShader(const char *ComputeShader, GLuint &computeId);
     void loadTextureDataJPG(int img_num);
     void loadTextureDataPBO(const char *imgPath);
     void resize(int w, int h);
     void draw();
-
+    void drawDXT();
     GLint posLoc;
     GLint uvLoc;
     GLint texLoc;
@@ -93,22 +94,29 @@ public:
     GLint matrixID, viewMatrixID, modelMatrixID;
     GLuint m_ProgramId; // program ID returned after compiling the shaders
     GLuint m_ComputeId;
+    GLuint m_ComputeId2;
     GLuint m_VertexBuffer; // VertexBuffer ID
     GLuint m_UVBuffer;// UV Buffer ID
     GLuint m_NormalBuffer;//Normal Buffer ID
     GLuint m_IndexBuffer;// Index Buffer ID
     GLuint m_TextureId;// Texture Id after GLgentextures
     GLuint m_TextureId2;
+    GLuint m_TextureIdDXT;
     GLuint m_ssbo;
     GLuint m_VertexArrayId; // Vertex array ID
     GLbyte *m_TextureDataPtr;// Texture data pointer, data loaded from a file generally
     GLuint m_PboId[2]; // Pixel buffer objects Id
     uint32_t m_NumIndices; // number of indices
+    uint32_t m_NumVertices;
     uint32_t m_TextureNumber; // number of the current Texture
     glm::mat4 m_Projection;
     glm::mat4 m_View;
+    glm::mat4 m_Scaling;
+    glm::mat4 m_Model;
     glm::mat4 m_MVP;
-
+    uint32_t m_screenW;
+    uint32_t m_screenH;
+    glm::vec3 m_camPosition;
     float scale[100];
     char m_TexturePath[256];
     char m_ObjPath[256];
