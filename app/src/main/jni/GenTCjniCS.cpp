@@ -8,7 +8,6 @@
 #include "stb_image.h"
 #include <jni.h>
 #include <cstdlib>
-
 #define SPHERE
 
 const char *vVertexProg =
@@ -19,7 +18,7 @@ const char *vVertexProg =
                 "out vec2 uv;\n"
                 "uniform mat4 MVP;\n"
                 "void main() {\n"
-                "  gl_Position = MVP*vec4(position, 1.0);\n"
+                "  gl_Position =  MVP*vec4(position, 1.0);\n"
                 "  uv = texCoord;\n"
                 "}\n";
 
@@ -68,13 +67,13 @@ const char *vDXTComputeProg =
             "   DXTBlock blocks[];\n"
             "};\n"
             "void main() {\n"
-            "   blocks[gl_WorkGroupID.x + 4* gl_WorkGroupID.y].endpoints =  0xFFFF * uint(mod(mod(float(gl_WorkGroupID.x), float(2)) , mod(float(gl_WorkGroupID.y), float(2))));\n"
-            "   blocks[gl_WorkGroupID.x + 4 * gl_WorkGroupID.y].interpolated = 0 ; \n"
+            "   uint color = 0xFFFFFFFF;\n"
+            "   uint zero = uint(0);\n"
+            "   blocks[uint( uint(gl_WorkGroupID.x) + uint(4) * uint(gl_WorkGroupID.y) )].endpoints = color * uint( mod(float(gl_WorkGroupID.x), float(2)) );\n "
+            "   blocks[uint( uint(gl_WorkGroupID.x) + uint(4) * uint(gl_WorkGroupID.y) )].interpolated = zero ; \n"
             "   memoryBarrierBuffer(); \n"
             "   barrier(); \n"
             "}\n";
-
-
 
 
 static const int vImageWidth = 1280;
@@ -84,6 +83,7 @@ static void printGlString(const char* name, GLenum s) {
     const char* v = (const char*)glGetString(s);
     ALOGV("GL %s: %s\n", name, v);
 }
+// //;
 
 
 
@@ -156,14 +156,11 @@ void RendererCS::initializeTexture(){
   CHECK_GL(glGenTextures, 1, &m_TextureId);
   CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureId);
  // CHECK_GL(glTexImage2D, GL_TEXTURE_2D,0,GL_RGBA8UI, vImageWidth, vImageHeight,0,GL_RGBA_INTEGER,GL_UNSIGNED_BYTE,NULL);
-
   CHECK_GL(glTexStorage2D, GL_TEXTURE_2D, 1, GL_RGBA8,vImageWidth, vImageHeight );
   CHECK_GL(glTexParameteri,GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
   CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   CHECK_GL(glBindImageTexture, 2, m_TextureId, 0, GL_FALSE,0, GL_WRITE_ONLY, GL_RGBA8UI); // possible error
   CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
-
-
 
 
   CHECK_GL(glGenTextures, 1, &m_TextureId2);
@@ -177,21 +174,20 @@ void RendererCS::initializeTexture(){
 
 
 
+  CHECK_GL(glGenTextures, 1, &m_TextureIdDXT);
+  CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdDXT);
+  CHECK_GL(glTexStorage2D, GL_TEXTURE_2D, 1, 0x83F1, vImageWidth, vImageHeight);
+  CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
 
-    CHECK_GL(glGenTextures, 1, &m_TextureIdDXT);
-    CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdDXT);
-    CHECK_GL(glTexStorage2D, GL_TEXTURE_2D, 1, 0x83F1, vImageWidth, vImageHeight);
-    CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
 
-
-    CHECK_GL(glGenBuffers, 2, m_PboId);
-    CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, m_PboId[0]);
-    CHECK_GL(glBufferData, GL_PIXEL_UNPACK_BUFFER, (vImageHeight*vImageWidth)/2, NULL, GL_DYNAMIC_DRAW);
-    CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, m_PboId[1]);
-    CHECK_GL(glBufferData, GL_PIXEL_UNPACK_BUFFER, (vImageHeight*vImageWidth)/2, NULL, GL_DYNAMIC_DRAW);
-    CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, 0);
+  CHECK_GL(glGenBuffers, 2, m_PboId);
+  CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, m_PboId[0]);
+  CHECK_GL(glBufferData, GL_PIXEL_UNPACK_BUFFER, (vImageHeight*vImageWidth)/2, NULL, GL_DYNAMIC_DRAW);
+  CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, m_PboId[1]);
+  CHECK_GL(glBufferData, GL_PIXEL_UNPACK_BUFFER, (vImageHeight*vImageWidth)/2, NULL, GL_DYNAMIC_DRAW);
+  CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
 void RendererCS::initializeScene() {
@@ -229,11 +225,18 @@ RendererCS::~RendererCS(){
     CHECK_GL(glDeleteBuffers, 1, &m_VertexBuffer);
     CHECK_GL(glDeleteBuffers, 1, &m_UVBuffer);
     CHECK_GL(glDeleteBuffers, 1, &m_IndexBuffer);
+    CHECK_GL(glDeleteBuffers, 1, &m_ssbo);
     CHECK_GL(glDeleteProgram, m_ProgramId);
+    CHECK_GL(glDeleteProgram, m_ComputeId);
+    CHECK_GL(glDeleteProgram, m_ComputeId2);
     CHECK_GL(glDeleteTextures, 1, &m_TextureId);
     CHECK_GL(glDeleteTextures,1, &m_TextureId2);
+    CHECK_GL(glDeleteTextures, 1, &m_TextureIdDXT);
     CHECK_GL(glDeleteBuffers, 2, m_PboId);
     CHECK_GL(glDeleteVertexArrays, 1, &m_VertexArrayId);
+    ALOGE("This is called...\n");
+
+
 
 }
 
@@ -269,7 +272,6 @@ void RendererCS::init(const char * path){
         1.0f, 1.0f, 0.0f,
         1.0f, -1.0f, 0.0f,
 
-
     };
 //    glGenBuffers(1, &m_VertexBuffer);
     CHECK_GL(glGenBuffers, 1, &m_VertexBuffer);
@@ -299,13 +301,13 @@ void RendererCS::init(const char * path){
     CHECK_GL(glBufferData, GL_ELEMENT_ARRAY_BUFFER,sizeof(Indices), Indices,GL_STATIC_DRAW);
     CHECK_GL(glBindBuffer, GL_ELEMENT_ARRAY_BUFFER,0);
     m_NumIndices = 6;
-    m_Projection = glm::perspective(90.0f, 4.0f / 3.0f, 0.1f, 1000.0f);
-   // m_Scaling = glm::scale(glm::vec3(5.0,5.0,5.0));
-    m_View = glm::lookAt(
-            glm::vec3(0,0,-10),
-            glm::vec3(0,0,0),
-            glm::vec3(0,1,0));
-    m_MVP = m_Projection * m_View; //* m_Scaling;
+    m_Projection = glm::perspective(90.0f, 1.5f, 0.1f, 1000.0f);
+//   // m_Scaling = glm::scale(glm::vec3(5.0,5.0,5.0));
+//    m_View = glm::lookAt(
+//            glm::vec3(0,0,-1),
+//            glm::vec3(0,0,0),
+//            glm::vec3(0,1,0));
+//    //m_MVP = m_Projection * m_View; //* m_Scaling;
 #endif
 
 #ifdef SPHERE
@@ -331,7 +333,7 @@ void RendererCS::init(const char * path){
     assert ( uvLoc >= 0 );
 
     texLoc = CHECK_GL(glGetUniformLocation, m_ProgramId, "tex");
-    //assert ( texLoc >= 0 );
+    assert ( texLoc >= 0 );
 
     texLocInCS = CHECK_GL(glGetUniformLocation, m_ComputeId, "colImage");
     assert(texLocInCS >=0 );
@@ -341,14 +343,13 @@ void RendererCS::init(const char * path){
     matrixID = CHECK_GL(glGetUniformLocation, m_ProgramId, "MVP");
     assert(matrixID >= 0);
 
-
 }
 
 void RendererCS::loadTextureDataJPG(int img_num) {
 
   char img_path[256];
   sprintf(img_path, "%s/360Shark%04d.jpg",m_TexturePath,img_num);
-    ALOGE("Path%s", m_TexturePath);
+  ALOGE("Path%s", m_TexturePath);
     int w,h,n;
   unsigned char *TextureData= stbi_load(img_path, &w, &h, &n, 4);
   ALOGE("checking the loaded texture: %d %d %d \n", w, h, img_num);
@@ -379,7 +380,7 @@ void RendererCS::resize(int w, int h){
 void RendererCS::loadComputeShader(const char *ComputeShader, GLuint &computeId){
 
     GLuint compShdrId = CHECK_GL(glCreateShader, GL_COMPUTE_SHADER);
-    CHECK_GL(glShaderSource, compShdrId, 1, &vComputeProg, NULL);
+    CHECK_GL(glShaderSource, compShdrId, 1, &ComputeShader, NULL);
     CHECK_GL(glCompileShader, compShdrId);
 
     int result, logLength;
@@ -410,23 +411,37 @@ void RendererCS::loadComputeShader(const char *ComputeShader, GLuint &computeId)
 
     }
 
+}
+
+
+
+void RendererCS::initializeCompressedTexture() {
+
+
+
+
+}
+
+void RendererCS::loadTextureDataDXT(int img_num) {
+
 
 
 
 }
 
 
+
 void RendererCS::draw(){
 
 
-  CHECK_GL(glUseProgram,m_ComputeId);
+  //CHECK_GL(glUseProgram,m_ComputeId);
   // Let's do some error checking
   int result;
+//
+std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
-  std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-
-  CHECK_GL(glGetProgramiv,m_ComputeId, GL_ACTIVE_UNIFORMS, &result);
-  ALOGE("count of active uniforms%d",result);
+  //CHECK_GL(glGetProgramiv,m_ComputeId, GL_ACTIVE_UNIFORMS, &result);
+  //ALOGE("count of active uniforms%d",result);
 
 // buffer for name
     GLchar * name = new GLchar[200];
@@ -439,22 +454,24 @@ void RendererCS::draw(){
 // loop over active uniforms getting each's name
 
 
-  CHECK_GL(glGetActiveUniform, m_ComputeId, 0,200,&length,&size,&type, name);
-  ALOGE("index location%d\n", texLocInCS);
-  ALOGE("index location 2 %d\n", texLocOutCS);
+  //CHECK_GL(glGetActiveUniform, m_ComputeId, 0,200,&length,&size,&type, name);
+  //ALOGE("index location%d\n", texLocInCS);
+ // ALOGE("index location 2 %d\n", texLocOutCS);
 
   m_TextureNumber = m_TextureNumber % 20 + 1;
   loadTextureDataJPG(m_TextureNumber);
 
 
-  std::chrono::high_resolution_clock::time_point compute_start = std::chrono::high_resolution_clock::now();
-  CHECK_GL(glBindBufferBase,GL_SHADER_STORAGE_BUFFER, 0, m_ssbo);
-  CHECK_GL(glBufferData, GL_SHADER_STORAGE_BUFFER, sizeof(scale), scale, GL_DYNAMIC_COPY);
-  CHECK_GL(glDispatchCompute, 1920/8, 1080/8, 1);
-  CHECK_GL(glMemoryBarrier, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-  std::chrono::high_resolution_clock::time_point compute_end = std::chrono::high_resolution_clock::now();
-  std::chrono::nanoseconds compute_time = std::chrono::duration_cast<std::chrono::nanoseconds>(compute_end - compute_start);
-  ALOGE("Compute Time %lld\n", compute_time.count());
+  //std::chrono::high_resolution_clock::time_point compute_start = std::chrono::high_resolution_clock::now();
+  //CHECK_GL(glBindBufferBase,GL_SHADER_STORAGE_BUFFER, 0, m_ssbo);
+  //CHECK_GL(glBufferData, GL_SHADER_STORAGE_BUFFER, sizeof(scale), scale, GL_DYNAMIC_COPY);
+ // CHECK_GL(glDispatchCompute, vImageWidth/8, vImageHeight/8, 1);
+  //CHECK_GL(glMemoryBarrier, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+  //std::chrono::high_resolution_clock::time_point compute_end = std::chrono::high_resolution_clock::now();
+ // std::chrono::nanoseconds compute_time = std::chrono::duration_cast<std::chrono::nanoseconds>(compute_end - compute_start);
+ // ALOGE("Compute Time %lld\n", compute_time.count());
+
+
     m_camPosition.z += 0.01;
     m_View = glm::lookAt(
             m_camPosition,
@@ -463,12 +480,12 @@ void RendererCS::draw(){
     m_MVP = m_Projection * m_View;
   CHECK_GL(glUseProgram,m_ProgramId);
   CHECK_GL(glClear,GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-    glUniformMatrix4fv(matrixID, 1, GL_FALSE, &m_MVP[0][0]);
+  CHECK_GL(glUniformMatrix4fv, matrixID, 1, GL_FALSE, &m_MVP[0][0]);
 
   CHECK_GL(glActiveTexture, GL_TEXTURE0);
 
 
-  CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureId);
+  CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureId2);
 
   CHECK_GL(glEnableVertexAttribArray, posLoc);
   CHECK_GL(glBindBuffer, GL_ARRAY_BUFFER, m_VertexBuffer);
@@ -482,7 +499,7 @@ void RendererCS::draw(){
 
   CHECK_GL(glBindBuffer, GL_ELEMENT_ARRAY_BUFFER, m_IndexBuffer);
   CHECK_GL(glDrawElements, GL_TRIANGLES, m_NumIndices , GL_UNSIGNED_SHORT, NULL);
-
+  ALOGE("Num indices %d\n", m_NumIndices);
   std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
   std::chrono::milliseconds frame_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
   ALOGE("Frame-Rate %lld\n", frame_time.count());
@@ -529,20 +546,17 @@ void RendererCS::drawDXT() {
     std::chrono::high_resolution_clock::time_point compute_start = std::chrono::high_resolution_clock::now();
 
     CHECK_GL(glBindBuffer, GL_SHADER_STORAGE_BUFFER, m_ssbo);
-    CHECK_GL(glBindBufferBase,GL_SHADER_STORAGE_BUFFER, 0, m_ssbo);
-    CHECK_GL(glBufferData, GL_SHADER_STORAGE_BUFFER, (vImageHeight * vImageWidth)/2, 0, GL_STATIC_COPY);
 
+    CHECK_GL(glBufferData, GL_SHADER_STORAGE_BUFFER, (vImageHeight * vImageWidth)/2, 0, GL_STATIC_COPY);
+    CHECK_GL(glBindBufferBase,GL_SHADER_STORAGE_BUFFER, 0, m_ssbo);
     CHECK_GL(glDispatchCompute, vImageWidth/4, vImageHeight/4, 1);
-    CHECK_GL(glMemoryBarrier, GL_SHADER_STORAGE_BARRIER_BIT);
+    CHECK_GL(glMemoryBarrier, GL_ALL_BARRIER_BITS);
     std::chrono::high_resolution_clock::time_point compute_end = std::chrono::high_resolution_clock::now();
     std::chrono::nanoseconds compute_time = std::chrono::duration_cast<std::chrono::nanoseconds>(compute_end - compute_start);
     ALOGE("Compute Time %lld\n", compute_time.count());
     CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, m_ssbo);
 
 //    CHECK_GL(glCopyBufferSubData, GL_COPY_READ_BUFFER, GL_PIXEL_UNPACK_BUFFER, 0, 0,(vImageWidth*vImageHeight)/2 );
-
-
-
 
     CHECK_GL(glActiveTexture, GL_TEXTURE0);
 
@@ -559,9 +573,10 @@ void RendererCS::drawDXT() {
                               0);     //
 
     CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, 0);
+    m_camPosition.z += 0.01;
     m_View = glm::lookAt(
             m_camPosition,
-            glm::vec3(0,0,-5),
+            glm::vec3(0,0,0),
             glm::vec3(0,1,0));
     m_MVP = m_Projection * m_View;
     CHECK_GL(glUseProgram,m_ProgramId);
@@ -578,6 +593,7 @@ void RendererCS::drawDXT() {
     CHECK_GL(glBindBuffer,GL_ARRAY_BUFFER, m_UVBuffer);
     CHECK_GL(glVertexAttribPointer,uvLoc, 2, GL_FLOAT, GL_FALSE, 0, NULL);
     CHECK_GL(glBindBuffer,GL_ARRAY_BUFFER, 0);
+    ALOGE("Num Indices: %d\n", m_NumIndices);
 
     CHECK_GL(glBindBuffer, GL_ELEMENT_ARRAY_BUFFER, m_IndexBuffer);
     CHECK_GL(glDrawElements, GL_TRIANGLES, m_NumIndices , GL_UNSIGNED_SHORT, NULL);
@@ -592,8 +608,6 @@ void RendererCS::drawDXT() {
     CHECK_GL(glBindBuffer, GL_ELEMENT_ARRAY_BUFFER, 0);
     CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
     CHECK_GL(glUseProgram, 0);
-
-
 
 }
 
@@ -630,6 +644,7 @@ Java_com_example_psrihariv_gentcmobile_GenTCJNILib_resize(JNIEnv* env, jobject o
 JNIEXPORT void JNICALL
 Java_com_example_psrihariv_gentcmobile_GenTCJNILib_draw(JNIEnv* env, jobject obj) {
     if (g_renderer) {
-        g_renderer->drawDXT();
+        //g_renderer->drawDXT();
+        g_renderer->draw();
     }
 }

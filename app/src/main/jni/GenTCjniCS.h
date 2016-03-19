@@ -9,7 +9,7 @@
 #include <math.h>
 #include <cstring>
 #include <cassert>
-
+#include <unistd.h>
 
 
 #include <GLES3/gl31.h>
@@ -67,6 +67,7 @@ static const char* getGLErrString(GLenum err){
 #endif
 
 
+
 class RendererCS{
 
 public:
@@ -79,9 +80,11 @@ public:
     void initializeScene();
     void intializeShaderBuffers();
     void initializeCompressedTexture();
+
     void loadShaders(const char *VertexShader, const char *FragmentShader);
     void loadComputeShader(const char *ComputeShader, GLuint &computeId);
     void loadTextureDataJPG(int img_num);
+    void loadTextureDataDXT(int img_num);
     void loadTextureDataPBO(const char *imgPath);
     void resize(int w, int h);
     void draw();
