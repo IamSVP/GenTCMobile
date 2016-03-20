@@ -10,19 +10,23 @@
 #include <cstring>
 #include <cassert>
 #include <unistd.h>
-
+#include <numeric>
 
 #include <GLES3/gl31.h>
 #include <EGL/egl.h>
 #include <vector>
 #include <chrono>
 #include <ctime>
+#include <iostream>
+#include <fstream>
+#include <stdio.h>
+
 #include "ObjLoader/objloader.hpp"
 #include "ObjLoader/vboindexer.hpp"
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/transform.hpp"
-
+#include "crn_decomp.h"
 
 #define DEBUG
 
@@ -34,6 +38,8 @@
 
 
 #ifdef DEBUG
+
+typedef unsigned long long ull;
 
 static const char* getGLErrString(GLenum err){
 
@@ -85,6 +91,7 @@ public:
     void loadComputeShader(const char *ComputeShader, GLuint &computeId);
     void loadTextureDataJPG(int img_num);
     void loadTextureDataDXT(int img_num);
+    void loadTextureDataCRN(int img_num);
     void loadTextureDataPBO(const char *imgPath);
     void resize(int w, int h);
     void draw();
@@ -119,6 +126,15 @@ public:
     glm::mat4 m_MVP;
     uint32_t m_screenW;
     uint32_t m_screenH;
+
+    uint32_t m_numframes;
+    std::vector<ull> m_CPULoad;
+    std::vector<ull> m_CPUDecode;
+    std::vector<ull> m_GPULoad;
+    std::vector<ull> m_GPUDecode;
+    std::vector<ull> m_TotalFps;
+
+
     glm::vec3 m_camPosition;
     float scale[100];
     char m_TexturePath[256];

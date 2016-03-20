@@ -17,7 +17,7 @@ model {
     }
     android.ndk {
         moduleName  = "GenTCjni"
-        cppFlags.addAll(["-std=c++11", "-Werror", "-fno-rtti", "-fno-exceptions"])
+        cppFlags.addAll(["-std=c++11", "-Wno-error", "-fno-rtti", "-fno-exceptions"])
         cppFlags.addAll(["-I${file("src/main/jni/ObjLoader")}".toString() ])
 
 
