@@ -66,7 +66,7 @@ const char *vDXTComputeProg =
             "   DXTBlock blocks[];\n"
             "};\n"
             "void main() {\n"
-            "   uint color = 0xFFFFFFFF;\n"
+            "   uint color = uint(0xFFFFFFFF);\n"
             "   uint zero = uint(0);\n"
             "   blocks[uint( uint(gl_WorkGroupID.x) + uint(320) * uint(gl_WorkGroupID.y) )].endpoints = color * uint( mod(float(gl_WorkGroupID.x), float(2)) );\n "
             "   blocks[uint( uint(gl_WorkGroupID.x) + uint(320) * uint(gl_WorkGroupID.y) )].interpolated = zero ; \n"
@@ -75,15 +75,24 @@ const char *vDXTComputeProg =
             "}\n";
 
 
-static const int vImageWidth = 512;
-static const int vImageHeight = 512;
+static const int vImageWidth = 2560;
+static const int vImageHeight = 1280;
+#define COMPRESSED_RGBA_ASTC_4x4 0x93B0
+#define COMPRESSED_RGBA_ASTC_8x8 0x93B7
+#define SPHERE
 
+#define ASTC4x4
+#define ASTC8x8
+#define ASTC12x12
+#define ASTC
+#define ETC
+//#define DXT1
+#define CRN
 
 static void printGlString(const char* name, GLenum s) {
     const char* v = (const char*)glGetString(s);
-    ALOGV("GL %s: %s\n", name, v);
+    ALOGE("GL %s: %s\n", name, v);
 }
-// //;
 
 void RendererCS::loadShaders(const char *VertexShader, const char *FragmentShader){
 
@@ -192,7 +201,7 @@ RendererCS::~RendererCS(){
     CHECK_GL(glDeleteTextures, 1, &m_TextureId);
     CHECK_GL(glDeleteTextures,1, &m_TextureId2);
     CHECK_GL(glDeleteTextures, 1, &m_TextureIdDXT);
-    CHECK_GL(glDeleteBuffers, 2, m_PboId);
+    //CHECK_GL(glDeleteBuffers, 2, m_PboId);
     CHECK_GL(glDeleteVertexArrays, 1, &m_VertexArrayId);
     ALOGE("This is called...\n");
 
@@ -202,6 +211,8 @@ void RendererCS::init(const char * path){
 
     sprintf(m_TexturePath,"%s/Textures",path);
     sprintf(m_ObjPath, "%s/Obj/sphere.obj", path);
+    sprintf(m_MetricsPath, "%s/output.txt", path);
+    fpOutFile = fopen(m_MetricsPath, "r");
     ALOGE("Path obj %s\n", m_ObjPath);
     m_TextureNumber = 1;
     CHECK_GL(glGenVertexArrays, 1, &m_VertexArrayId);
@@ -273,6 +284,8 @@ void RendererCS::init(const char * path){
     initializeScene();
     m_Projection = glm::perspective(90.0f, 1.5f, 0.1f, 1000.0f);
     m_Scaling = glm::scale(glm::vec3(5.0,5.0,5.0));
+
+    m_camDirection = glm::vec3(0,0,5);
     m_camPosition = glm::vec3(0,0,0);
     m_View = glm::lookAt(
                             glm::vec3(0,0,0),
@@ -282,8 +295,8 @@ void RendererCS::init(const char * path){
 
 
 #endif
-    initializeTexture();
-    //initializeCompressedTexture();
+    //initializeTexture();
+    initializeCompressedTexture();
     posLoc = CHECK_GL(glGetAttribLocation,m_ProgramId, "position");
     assert ( posLoc >= 0 );
 
@@ -390,19 +403,27 @@ void RendererCS::initializeTexture()   {
 
 void RendererCS::initializeCompressedTexture()   {
 
+
+
     CHECK_GL(glGenTextures, 1, &m_TextureIdDXT);
     CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdDXT);
+
+#ifdef DXT1
     CHECK_GL(glTexStorage2D, GL_TEXTURE_2D, 1, 0x83F1, vImageHeight, vImageWidth );
+#endif
+
+#ifdef ASTC4x4
+    CHECK_GL(glGenTextures, 1,&m_TextureIdCmp);
+    CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdCmp);
+    CHECK_GL(glTexStorage2D, GL_TEXTURE_2D, 1, COMPRESSED_RGBA_ASTC_4x4, vImageHeight, vImageWidth);
+#endif
+
+
     CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
 
-    CHECK_GL(glGenBuffers, 2, m_PboId);
-    CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, m_PboId[0]);
-    CHECK_GL(glBufferData, GL_PIXEL_UNPACK_BUFFER, (vImageHeight*vImageWidth)/2, NULL, GL_DYNAMIC_DRAW);
-    CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, m_PboId[1]);
-    CHECK_GL(glBufferData, GL_PIXEL_UNPACK_BUFFER, (vImageHeight*vImageWidth)/2, NULL, GL_DYNAMIC_DRAW);
-    CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, 0);
+
 
 }
 
@@ -459,6 +480,7 @@ void RendererCS::loadTextureDataDXT(int img_num)  {
    // ALOGE("fooooddd here\n");
     CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
     free(blocks);
+    fclose(fp);
 }
 
 static crn_uint8 *read_file_into_buffer(const char *pFilename, crn_uint32 &size)   {
@@ -562,11 +584,126 @@ void RendererCS::loadTextureDataCRN(int img_num)  {
 
 }
 
+
+void RendererCS::loadTextureDataASTC4x4(int img_num) {
+
+    unsigned char *blocks;
+    size_t  TexSz = vImageHeight * vImageWidth;
+    blocks = (unsigned char *)malloc( sizeof(unsigned char) * TexSz);
+
+    char img_path[256];
+
+    sprintf(img_path, "%s/360MegaCoaster2k/ASTC4x4/360MegaCoaster2k%06d.astc",m_TexturePath,7);
+    ALOGE("Path %s", img_path);
+    unsigned char t[16];
+    FILE *fp = fopen(img_path, "rb");
+    fread(t,1,16,fp);
+    std::chrono::high_resolution_clock::time_point CPULoad_Start = std::chrono::high_resolution_clock::now();
+    size_t numBytes = fread(blocks, 1, TexSz, fp);
+    if( numBytes <= 0 )
+        ALOGE("Num bytes :%lld\n",numBytes);
+    else
+        ALOGE("Num bytes :%lld\n",numBytes);
+    std::chrono::high_resolution_clock::time_point CPULoad_End = std::chrono::high_resolution_clock::now();
+
+    std::chrono::nanoseconds CPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPULoad_End - CPULoad_Start);
+    m_CPULoad.push_back(CPULoad_Time.count());
+
+
+
+//    CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, m_PboId[0]);
+//
+//    blocks = (GLubyte*)CHECK_GL(glMapBufferRange, GL_PIXEL_UNPACK_BUFFER, 0, (vImageHeight * vImageWidth)/2, GL_WRITE_ONLY);
+//    if(blocks){
+//
+//        input.read(blocks, (vImageHeight * vImageWidth)/2);
+//        CHECK_GL(glUnmapBuffer, GL_PIXEL_UNPACK_BUFFER);
+//    }
+
+    // GPU Loading........
+    std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
+    CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdCmp);
+    CHECK_GL(glCompressedTexSubImage2D, GL_TEXTURE_2D,    // Type of texture
+             0,                // level (0 being the top level i.e. full size)
+             0, 0,             // Offset
+             vImageWidth,       // Width of the texture
+             vImageHeight,      // Height of the texture,
+             COMPRESSED_RGBA_ASTC_4x4,          // Data format
+             TexSz, // Type of texture data
+             blocks);
+
+    std::chrono::high_resolution_clock ::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
+    std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
+    m_GPULoad.push_back(GPULoad_Time.count());
+
+    // CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, 0);
+    // ALOGE("fooooddd here\n");
+    CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
+    free(blocks);
+    fclose(fp);
+
+}
+void RendererCS::loadTextureDataASTC8x8(int img_num) {
+
+    unsigned char *blocks;
+    size_t  TexSz = vImageHeight * vImageWidth/4;
+    blocks = (unsigned char *)malloc( sizeof(unsigned char) * TexSz);
+
+    char img_path[256];
+
+    sprintf(img_path, "%s/360MegaCoaster2k/ASTC8x8/360MegaCoaster2k%06d.astc",m_TexturePath,img_num);
+    ALOGE("Path %s", img_path);
+
+    FILE *fp = fopen(img_path, "rb");
+
+    std::chrono::high_resolution_clock::time_point CPULoad_Start = std::chrono::high_resolution_clock::now();
+
+    if(fread(blocks, 1, TexSz, fp) <= 0)
+        ALOGE("Block is NULL\n");
+    std::chrono::high_resolution_clock::time_point CPULoad_End = std::chrono::high_resolution_clock::now();
+
+    std::chrono::nanoseconds CPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPULoad_End - CPULoad_Start);
+    m_CPULoad.push_back(CPULoad_Time.count());
+
+
+
+//    CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, m_PboId[0]);
+//
+//    blocks = (GLubyte*)CHECK_GL(glMapBufferRange, GL_PIXEL_UNPACK_BUFFER, 0, (vImageHeight * vImageWidth)/2, GL_WRITE_ONLY);
+//    if(blocks){
+//
+//        input.read(blocks, (vImageHeight * vImageWidth)/2);
+//        CHECK_GL(glUnmapBuffer, GL_PIXEL_UNPACK_BUFFER);
+//    }
+
+    // GPU Loading........
+    std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
+    CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdCmp);
+    CHECK_GL(glCompressedTexSubImage2D, GL_TEXTURE_2D,    // Type of texture
+             0,                // level (0 being the top level i.e. full size)
+             0, 0,             // Offset
+             vImageWidth,       // Width of the texture
+             vImageHeight,      // Height of the texture,
+             COMPRESSED_RGBA_ASTC_8x8,          // Data format
+             TexSz, // Type of texture data
+             blocks);
+
+    std::chrono::high_resolution_clock ::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
+    std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
+    m_GPULoad.push_back(GPULoad_Time.count());
+
+    // CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, 0);
+    // ALOGE("fooooddd here\n");
+    CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
+    free(blocks);
+    fclose(fp);
+
+}
 void RendererCS::loadTextureDataJPG(int img_num)   {
 
     char img_path[256];
-    sprintf(img_path, "%s/JPG/Pixar_bmp/Pixar_bmp%05d.jpg",m_TexturePath,img_num);
-    ALOGE("Path%s", m_TexturePath);
+    sprintf(img_path, "%s/360Shark%04d.jpg",m_TexturePath,img_num);
+    ALOGE("Path%s", img_path);
     int w,h,n;
 
     unsigned char *ImageDataPtr = (unsigned char *)malloc((vImageHeight * vImageWidth * 4));
@@ -589,7 +726,7 @@ void RendererCS::loadTextureDataJPG(int img_num)   {
 
     std::chrono::nanoseconds CPUDecode_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPUDecode_End - CPUDecode_Start);
     m_CPUDecode.push_back(CPUDecode_Time.count());
-
+    free(ImageDataPtr);
 
     ALOGE("checking the loaded texture: %d %d %d \n", w, h, img_num);
 
@@ -612,19 +749,20 @@ void RendererCS::loadTextureDataJPG(int img_num)   {
 
 
     CHECK_GL(glBindTexture,GL_TEXTURE_2D, 0);
-    free(ImageDataPtr);
+
     stbi_image_free(TextureData);
+    fclose(fp);
 
 }
 
-void RendererCS::draw()  {
+void RendererCS::draw(float AngleX, float AngleY)  {
 
 
   //CHECK_GL(glUseProgram,m_ComputeId);
   // Let's do some error checking
   int result;
 //
-std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+
 
   //CHECK_GL(glGetProgramiv,m_ComputeId, GL_ACTIVE_UNIFORMS, &result);
   //ALOGE("count of active uniforms%d",result);
@@ -638,17 +776,17 @@ std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolut
 // Count of variables
     GLint size;
 // loop over active uniforms getting each's name
-
+    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
   //CHECK_GL(glGetActiveUniform, m_ComputeId, 0,200,&length,&size,&type, name);
   //ALOGE("index location%d\n", texLocInCS);
  // ALOGE("index location 2 %d\n", texLocOutCS);
 
-  m_TextureNumber = m_TextureNumber % 40 + 1;
-  loadTextureDataJPG(m_TextureNumber);
+  m_TextureNumber = m_TextureNumber % 50+ 1;
+  //loadTextureDataJPG(m_TextureNumber);
   //loadTextureDataDXT(m_TextureNumber);
   //loadTextureDataCRN(m_TextureNumber);
-
+  loadTextureDataASTC4x4(m_TextureNumber);
 
   //std::chrono::high_resolution_clock::time_point compute_start = std::chrono::high_resolution_clock::now();
   //CHECK_GL(glBindBufferBase,GL_SHADER_STORAGE_BUFFER, 0, m_ssbo);
@@ -661,11 +799,23 @@ std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolut
 
 
     //m_camPosition.z += 0.01;
+//    if(m_AngleX != AngleX || m_AngleY != AngleY) {
+//        m_AngleX = AngleX;
+//        m_AngleY = AngleY;
+//        glm::vec4 tempCam =
+//                glm::rotate(AngleX, glm::vec3(1, 0, 0)) * glm::rotate(AngleY, glm::vec3(0, 1, 0)) *
+//                glm::vec4(m_camDirection, 1);
+//        tempCam = tempCam / tempCam.w;
+//        m_camDirection = glm::vec3(tempCam);
+//    }
     m_View = glm::lookAt(
             m_camPosition,
-            glm::vec3(0,0,0),
+            m_camDirection,
             glm::vec3(0,1,0));
-    m_MVP = m_Projection * m_View;
+
+    m_MVP = m_Projection * m_View * m_Scaling;
+
+
   CHECK_GL(glUseProgram,m_ProgramId);
   CHECK_GL(glClear,GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
   CHECK_GL(glUniformMatrix4fv, matrixID, 1, GL_FALSE, &m_MVP[0][0]);
@@ -673,7 +823,7 @@ std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolut
   CHECK_GL(glActiveTexture, GL_TEXTURE0);
 
 
-  CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureId2);
+  CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdCmp);
 
   CHECK_GL(glEnableVertexAttribArray, posLoc);
   CHECK_GL(glBindBuffer, GL_ARRAY_BUFFER, m_VertexBuffer);
@@ -700,7 +850,7 @@ std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolut
   CHECK_GL(glUseProgram, 0);
 
   m_numframes = m_numframes + 1;
-  if(m_numframes>11){
+  if(m_numframes>=10){
 
       ull CPU_load, CPU_decode, GPU_Load, FPS;
       if(!m_CPULoad.empty())
@@ -712,27 +862,26 @@ std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolut
       if(!m_GPULoad.empty())
           GPU_Load = std::accumulate(m_GPULoad.begin(), m_GPULoad.end(), 0)/m_GPULoad.size();
 
-      if(m_TotalFps.empty())
+      if(!m_TotalFps.empty())
           FPS = std::accumulate(m_TotalFps.begin(), m_TotalFps.end(), 0)/m_TotalFps.size();
+      ALOGV("CPU Load Time : %lld--%d\n", CPU_load, m_CPULoad.size());
+      ALOGV("CPU Decode Time: %lld--%d\n", CPU_decode, m_CPUDecode.size());
+      ALOGV("GPU Load Time: %lld--%d\n", GPU_Load, m_GPULoad.size());
 
+      ALOGV("FPS: %lld--%d\n", FPS, m_TotalFps.size());
       m_CPULoad.clear();
       m_CPUDecode.clear();
       m_GPULoad.clear();
       m_TotalFps.clear();
 
-      ALOGE("CPU Load Time : %lld\n", CPU_load);
-      ALOGE("CPU Decode Time: %lld\n", CPU_decode);
-      ALOGE("GPU Load Time: %lld\n", GPU_Load);
 
-      ALOGE("FPS: %lld\n", FPS);
       m_numframes = 0;
-
   }
 
 
 }
 
-void RendererCS::drawDXT()   {
+void RendererCS::drawDXT(float AngleX, float AngleY)   {
 
     CHECK_GL(glUseProgram,m_ComputeId2);
     // Let's do some error checking
@@ -836,7 +985,7 @@ RendererCS* g_renderer = NULL;
 extern "C" {
 JNIEXPORT void JNICALL Java_com_example_psrihariv_gentcmobile_GenTCJNILib_init(JNIEnv* env, jobject obj, jstring path);
 JNIEXPORT void JNICALL Java_com_example_psrihariv_gentcmobile_GenTCJNILib_resize(JNIEnv* env, jobject obj, jint width, jint height);
-JNIEXPORT void JNICALL Java_com_example_psrihariv_gentcmobile_GenTCJNILib_draw(JNIEnv* env, jobject obj);
+JNIEXPORT void JNICALL Java_com_example_psrihariv_gentcmobile_GenTCJNILib_draw(JNIEnv* env, jobject obj, jfloat AngleX, jfloat AngleY);
 JNIEXPORT void JNICALL Java_com_example_psrihariv_gentcmobile_GenTCJNILib_sendString(JNIEnv* env, jobject obj, jstring path);
 };
 
@@ -861,9 +1010,10 @@ Java_com_example_psrihariv_gentcmobile_GenTCJNILib_resize(JNIEnv* env, jobject o
 }
 
 JNIEXPORT void JNICALL
-Java_com_example_psrihariv_gentcmobile_GenTCJNILib_draw(JNIEnv* env, jobject obj) {
+Java_com_example_psrihariv_gentcmobile_GenTCJNILib_draw(JNIEnv* env, jobject obj, jfloat AngleX, jfloat AngleY) {
     if (g_renderer) {
-       // g_renderer->drawDXT();
-        g_renderer->draw();
+        //g_renderer->drawDXT(angle);
+        g_renderer->draw(AngleX, AngleY);
+        ALOGE("error angle %f - %f\n",AngleX, AngleY);
     }
 }

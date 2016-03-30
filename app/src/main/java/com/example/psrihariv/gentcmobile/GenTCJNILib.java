@@ -11,7 +11,7 @@ public class GenTCJNILib {
     }
 
     public static native void init(String path);
-    public static native void draw();
+    public static native void draw(float AngleX, float AngleY);
     public static native void resize(int width, int height);
 
 }

@@ -31,15 +31,19 @@
 #define DEBUG
 
 #define LOG_TAG "GenTCJNI"
-#define ALOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #ifdef  DEBUG
+#define ALOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define ALOGV(...) __android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)
+
+#else
+#define ALOGE(...) //
+#define ALOGV(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #endif
 
 
 #ifdef DEBUG
 
-typedef unsigned long long ull;
+
 
 static const char* getGLErrString(GLenum err){
 
@@ -69,10 +73,11 @@ static const char* getGLErrString(GLenum err){
     }                                                                                \
   } while(0)
 #else
-#define CHECK_GL(fn, ...) do { fn(__VA__ARGS__); } while(0)
+#define CHECK_GL(fn, ...) fn(__VA_ARGS__);
 #endif
 
 
+typedef unsigned long long ull;
 
 class RendererCS{
 
@@ -93,9 +98,11 @@ public:
     void loadTextureDataDXT(int img_num);
     void loadTextureDataCRN(int img_num);
     void loadTextureDataPBO(const char *imgPath);
+    void loadTextureDataASTC4x4(int img_num);
+    void loadTextureDataASTC8x8(int img_num);
     void resize(int w, int h);
-    void draw();
-    void drawDXT();
+    void draw(float AngleX, float AngleY );
+    void drawDXT(float AngleX, float AngleY);
     GLint posLoc;
     GLint uvLoc;
     GLint texLoc;
@@ -112,6 +119,7 @@ public:
     GLuint m_TextureId;// Texture Id after GLgentextures
     GLuint m_TextureId2;
     GLuint m_TextureIdDXT;
+    GLuint m_TextureIdCmp;
     GLuint m_ssbo;
     GLuint m_VertexArrayId; // Vertex array ID
     GLbyte *m_TextureDataPtr;// Texture data pointer, data loaded from a file generally
@@ -126,6 +134,8 @@ public:
     glm::mat4 m_MVP;
     uint32_t m_screenW;
     uint32_t m_screenH;
+    float m_AngleX;
+    float m_AngleY;
 
     uint32_t m_numframes;
     std::vector<ull> m_CPULoad;
@@ -136,9 +146,12 @@ public:
 
 
     glm::vec3 m_camPosition;
+    glm::vec3 m_camDirection;
     float scale[100];
     char m_TexturePath[256];
     char m_ObjPath[256];
+    char m_MetricsPath[256];
+    FILE *fpOutFile;
 
     const EGLContext m_EglContext;
 

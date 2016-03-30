@@ -19,17 +19,17 @@ model {
         moduleName  = "GenTCjni"
         cppFlags.addAll(["-std=c++11", "-Wno-error", "-fno-rtti", "-fno-exceptions"])
         cppFlags.addAll(["-I${file("src/main/jni/ObjLoader")}".toString() ])
-
-
-
-
-
+        cppFlags.addAll(["-I${file("src/main/jni/native_app_glue")}".toString(),
+                         "-I${file("src/main/jni/cpufeatures")}".toString(),
+                         "-I${file("src/main/jni/ndk_helper")}".toString()])
         CFlags.add("-Werror")
-        ldLibs.addAll(["log","GLESv3", "EGL"])
+        ldLibs.addAll(["android", "dl" , "log","GLESv3", "EGL"])
 
         stl         = "gnustl_static"
 
     }
+
+
     android.sources {
         main {
             jni {
@@ -37,10 +37,11 @@ model {
 
                     srcDirs = [ 'src/main/jni', 'src/main/jni/ObjLoader']
                 }
-
             }
         }
     }
+
+
 
     android.buildTypes {
         release {
@@ -50,6 +51,7 @@ model {
     }
 
     android.productFlavors {
+
         create("arm"){
             ndk.abiFilters.add("armeabi")
         }
@@ -68,8 +70,6 @@ model {
         // build one including all cpu architectures
         create("all")
     }
-
-
 
 }
 

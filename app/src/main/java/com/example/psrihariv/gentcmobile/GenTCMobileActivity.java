@@ -10,6 +10,8 @@ import java.io.File;
 /**
  * Created by psrihariv on 3/1/2016.
  */
+
+
 public class GenTCMobileActivity extends Activity {
 
     GenTCView mView;
