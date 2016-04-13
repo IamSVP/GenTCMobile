@@ -12,6 +12,8 @@
 const char *vVertexProg =
         "#version 310 es\n"
                 "precision mediump float;\n"
+
+
                 "in vec3 position;\n"
                 "in vec2 texCoord;\n"
                 "out vec2 uv;\n"
@@ -79,15 +81,18 @@ static const int vImageWidth = 2560;
 static const int vImageHeight = 1280;
 #define COMPRESSED_RGBA_ASTC_4x4 0x93B0
 #define COMPRESSED_RGBA_ASTC_8x8 0x93B7
+#define COMPRESSED_RGBA_ASTC_12x12 0x93BD
+#define COMPRESSED_RGB8_ETC1 0x8D64
 #define SPHERE
 
 #define ASTC4x4
-#define ASTC8x8
-#define ASTC12x12
+//#define ASTC8x8
+//#define ASTC12x12
 #define ASTC
-#define ETC
+//#define ETC1
 //#define DXT1
-#define CRN
+//#define CRN
+//#define JPG
 
 static void printGlString(const char* name, GLenum s) {
     const char* v = (const char*)glGetString(s);
@@ -116,20 +121,19 @@ void RendererCS::loadShaders(const char *VertexShader, const char *FragmentShade
     ALOGE("Error while compiling vertex shader", &VertexShaderErrorMsg[0]);
     exit(1);
   }
-
   // create the fragment shader
   CHECK_GL(glShaderSource, fragShdrId, 1, &vFragProg, NULL);
   CHECK_GL(glCompileShader, fragShdrId);
   CHECK_GL(glGetShaderiv, fragShdrId, GL_COMPILE_STATUS, &result);
 
-  if(result != GL_TRUE){
+  if(result != GL_TRUE)
+  {
     CHECK_GL(glGetShaderiv, fragShdrId, GL_INFO_LOG_LENGTH, &logLength);
     std::vector<char> FragmentShaderErrMsg(logLength);
     CHECK_GL(glGetShaderInfoLog, fragShdrId, logLength, NULL, &FragmentShaderErrMsg[0]);
     ALOGE("Error while comipling fragment shader", &FragmentShaderErrMsg[0]);
     exit(1);
   }
-
 
   m_ProgramId = CHECK_GL(glCreateProgram);
   CHECK_GL(glAttachShader, m_ProgramId, verShdrId);
@@ -138,14 +142,13 @@ void RendererCS::loadShaders(const char *VertexShader, const char *FragmentShade
 
   CHECK_GL(glGetProgramiv, m_ProgramId, GL_LINK_STATUS, &result);
   if(result != GL_TRUE){
+
     CHECK_GL(glGetProgramiv, m_ProgramId, GL_INFO_LOG_LENGTH, &logLength);
     std::vector<char> ProgramErrMsg(logLength);
     CHECK_GL(glGetProgramInfoLog, m_ProgramId, logLength, NULL, &ProgramErrMsg[0]);
     ALOGE("Error while Linking the program", &ProgramErrMsg[0]);
+
   }
-
-
-
 }
 
 // Look up more on gl_context and egl context and how's it handled
@@ -201,6 +204,7 @@ RendererCS::~RendererCS(){
     CHECK_GL(glDeleteTextures, 1, &m_TextureId);
     CHECK_GL(glDeleteTextures,1, &m_TextureId2);
     CHECK_GL(glDeleteTextures, 1, &m_TextureIdDXT);
+    CHECK_GL(glDeleteTextures, 1, &m_TextureIdCmp);
     //CHECK_GL(glDeleteBuffers, 2, m_PboId);
     CHECK_GL(glDeleteVertexArrays, 1, &m_VertexArrayId);
     ALOGE("This is called...\n");
@@ -295,8 +299,14 @@ void RendererCS::init(const char * path){
 
 
 #endif
-    //initializeTexture();
+
+#ifdef JPG
+    initializeTexture();
+#endif
+
+#ifndef JPG
     initializeCompressedTexture();
+#endif
     posLoc = CHECK_GL(glGetAttribLocation,m_ProgramId, "position");
     assert ( posLoc >= 0 );
 
@@ -326,7 +336,7 @@ void RendererCS::resize(int w, int h){
 
 }
 
-void RendererCS::loadComputeShader(const char *ComputeShader, GLuint &computeId)  {
+void RendererCS::loadComputeShader(const char *ComputeShader, GLuint &computeId){
 
     GLuint compShdrId = CHECK_GL(glCreateShader, GL_COMPUTE_SHADER);
     CHECK_GL(glShaderSource, compShdrId, 1, &ComputeShader, NULL);
@@ -404,18 +414,27 @@ void RendererCS::initializeTexture()   {
 void RendererCS::initializeCompressedTexture()   {
 
 
-
-    CHECK_GL(glGenTextures, 1, &m_TextureIdDXT);
-    CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdDXT);
+    CHECK_GL(glGenTextures, 1,&m_TextureIdCmp);
+    CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdCmp);
 
 #ifdef DXT1
-    CHECK_GL(glTexStorage2D, GL_TEXTURE_2D, 1, 0x83F1, vImageHeight, vImageWidth );
+    CHECK_GL(glGenTextures, 1, &m_TextureIdCmp);
+    CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdCmp);
+    CHECK_GL(glTexStorage2D, GL_TEXTURE_2D, 1, 0x83F1, vImageWidth, vImageHeight);
 #endif
 
 #ifdef ASTC4x4
-    CHECK_GL(glGenTextures, 1,&m_TextureIdCmp);
-    CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdCmp);
-    CHECK_GL(glTexStorage2D, GL_TEXTURE_2D, 1, COMPRESSED_RGBA_ASTC_4x4, vImageHeight, vImageWidth);
+    CHECK_GL(glTexStorage2D, GL_TEXTURE_2D, 1, COMPRESSED_RGBA_ASTC_4x4, vImageWidth, vImageHeight);
+#endif
+
+#ifdef ASTC8x8
+    CHECK_GL(glTexStorage2D, GL_TEXTURE_2D, 1, COMPRESSED_RGBA_ASTC_8x8, vImageWidth, vImageHeight);
+#endif
+#ifdef ASTC12x12
+    CHECK_GL(glTexStorage2D, GL_TEXTURE_2D, 1, COMPRESSED_RGBA_ASTC_12x12, vImageWidth, vImageHeight);
+#endif
+#ifdef ETC1
+    CHECK_GL(glTexStorage2D, GL_TEXTURE_2D, 1, COMPRESSED_RGB8_ETC1, vImageWidth, vImageHeight);
 #endif
 
 
@@ -427,6 +446,8 @@ void RendererCS::initializeCompressedTexture()   {
 
 }
 
+
+
 void RendererCS::loadTextureDataDXT(int img_num)  {
 
     unsigned char *blocks;
@@ -435,7 +456,7 @@ void RendererCS::loadTextureDataDXT(int img_num)  {
         ALOGE("Block is NULL\n");
     char img_path[256];
 
-    sprintf(img_path, "%s/DXT/Pixar_bmp/Pixar_bmp%05d.DXT1",m_TexturePath,img_num);
+    sprintf(img_path, "%s/360MegaCoaster2k/DXT1/360MegaCoaster2k%06d.DXT1",m_TexturePath,img_num);
     ALOGE("Path %s", img_path);
 
     FILE *fp = fopen(img_path, "rb");
@@ -462,7 +483,7 @@ void RendererCS::loadTextureDataDXT(int img_num)  {
 
     // GPU Loading........
     std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
-    CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdDXT);
+    CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdCmp);
     CHECK_GL(glCompressedTexSubImage2D, GL_TEXTURE_2D,    // Type of texture
              0,                // level (0 being the top level i.e. full size)
              0, 0,             // Offset
@@ -511,7 +532,7 @@ static crn_uint8 *read_file_into_buffer(const char *pFilename, crn_uint32 &size)
 void RendererCS::loadTextureDataCRN(int img_num)  {
 
     char img_path[256];
-    sprintf(img_path, "%s/CRN/Pixar_bmp/Pixar_bmp%05d.CRN",m_TexturePath,img_num);
+    sprintf(img_path, "%s/360MegaCoaster2k/CRN/360MegaCoaster2k%06d.CRN",m_TexturePath,img_num);
     ALOGE("Path%s", img_path);
 
     crn_uint32 src_file_size;
@@ -563,7 +584,7 @@ void RendererCS::loadTextureDataCRN(int img_num)  {
     std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
     crnd::crnd_unpack_level(pContext, &TextureData, total_face_size, row_pitch,0);
     if(TextureData == NULL) ALOGE("Texture Data is Null\n");
-    CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdDXT);
+    CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdCmp);
     CHECK_GL(glCompressedTexSubImage2D, GL_TEXTURE_2D,    // Type of texture
                               0,                // level (0 being the top level i.e. full size)
                               0, 0,             // Offset
@@ -583,8 +604,6 @@ void RendererCS::loadTextureDataCRN(int img_num)  {
     free(TextureData);
 
 }
-
-
 void RendererCS::loadTextureDataASTC4x4(int img_num) {
 
     unsigned char *blocks;
@@ -593,15 +612,15 @@ void RendererCS::loadTextureDataASTC4x4(int img_num) {
 
     char img_path[256];
 
-    sprintf(img_path, "%s/360MegaCoaster2k/ASTC4x4/360MegaCoaster2k%06d.astc",m_TexturePath,7);
+    sprintf(img_path, "%s/360MegaCoaster2k/ASTC4x4/360MegaCoaster2k%06d.astc",m_TexturePath,img_num);
     ALOGE("Path %s", img_path);
     unsigned char t[16];
     FILE *fp = fopen(img_path, "rb");
-    fread(t,1,16,fp);
+   fread(t,1,16,fp);
     std::chrono::high_resolution_clock::time_point CPULoad_Start = std::chrono::high_resolution_clock::now();
     size_t numBytes = fread(blocks, 1, TexSz, fp);
     if( numBytes <= 0 )
-        ALOGE("Num bytes :%lld\n",numBytes);
+        ALOGE("TexSz bytes :%lld\n",TexSz);
     else
         ALOGE("Num bytes :%lld\n",numBytes);
     std::chrono::high_resolution_clock::time_point CPULoad_End = std::chrono::high_resolution_clock::now();
@@ -655,7 +674,10 @@ void RendererCS::loadTextureDataASTC8x8(int img_num) {
     ALOGE("Path %s", img_path);
 
     FILE *fp = fopen(img_path, "rb");
+    ALOGE("Path %s", img_path);
+    unsigned char t[16];
 
+    fread(t,1,16,fp);
     std::chrono::high_resolution_clock::time_point CPULoad_Start = std::chrono::high_resolution_clock::now();
 
     if(fread(blocks, 1, TexSz, fp) <= 0)
@@ -699,10 +721,71 @@ void RendererCS::loadTextureDataASTC8x8(int img_num) {
     fclose(fp);
 
 }
+
+void RendererCS::loadTextureDataASTC12x12(int img_num){
+
+  unsigned char *blocks;
+    size_t  TexSz = vImageHeight * vImageWidth/4;
+    blocks = (unsigned char *)malloc( sizeof(unsigned char) * TexSz);
+
+    char img_path[256];
+
+    sprintf(img_path, "%s/360MegaCoaster2k/ASTC12x12/360MegaCoaster2k%06d.astc",m_TexturePath,img_num);
+    ALOGE("Path %s", img_path);
+
+    FILE *fp = fopen(img_path, "rb");
+    ALOGE("Path %s", img_path);
+    unsigned char t[16];
+
+    fread(t,1,16,fp);
+    std::chrono::high_resolution_clock::time_point CPULoad_Start = std::chrono::high_resolution_clock::now();
+
+    if(fread(blocks, 1, TexSz, fp) <= 0)
+        ALOGE("Block is NULL\n");
+    std::chrono::high_resolution_clock::time_point CPULoad_End = std::chrono::high_resolution_clock::now();
+
+    std::chrono::nanoseconds CPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPULoad_End - CPULoad_Start);
+    m_CPULoad.push_back(CPULoad_Time.count());
+
+
+
+//    CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, m_PboId[0]);
+//
+//    blocks = (GLubyte*)CHECK_GL(glMapBufferRange, GL_PIXEL_UNPACK_BUFFER, 0, (vImageHeight * vImageWidth)/2, GL_WRITE_ONLY);
+//    if(blocks){
+//
+//        input.read(blocks, (vImageHeight * vImageWidth)/2);
+//        CHECK_GL(glUnmapBuffer, GL_PIXEL_UNPACK_BUFFER);
+//    }
+
+    // GPU Loading........
+    std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
+    CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdCmp);
+    CHECK_GL(glCompressedTexSubImage2D, GL_TEXTURE_2D,    // Type of texture
+             0,                // level (0 being the top level i.e. full size)
+             0, 0,             // Offset
+             vImageWidth,       // Width of the texture
+             vImageHeight,      // Height of the texture,
+             COMPRESSED_RGBA_ASTC_12x12,          // Data format
+             TexSz, // Type of texture data
+             blocks);
+
+    std::chrono::high_resolution_clock ::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
+    std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
+    m_GPULoad.push_back(GPULoad_Time.count());
+
+    // CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, 0);
+    // ALOGE("fooooddd here\n");
+    CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
+    free(blocks);
+    fclose(fp);
+
+}
+
 void RendererCS::loadTextureDataJPG(int img_num)   {
 
     char img_path[256];
-    sprintf(img_path, "%s/360Shark%04d.jpg",m_TexturePath,img_num);
+    sprintf(img_path, "%s/360MegaCoaster2k/JPG/360MegaCoaster2k%06d.jpg",m_TexturePath,img_num);
     ALOGE("Path%s", img_path);
     int w,h,n;
 
@@ -747,7 +830,6 @@ void RendererCS::loadTextureDataJPG(int img_num)   {
     std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
     m_GPULoad.push_back(GPULoad_Time.count());
 
-
     CHECK_GL(glBindTexture,GL_TEXTURE_2D, 0);
 
     stbi_image_free(TextureData);
@@ -756,14 +838,10 @@ void RendererCS::loadTextureDataJPG(int img_num)   {
 }
 
 void RendererCS::draw(float AngleX, float AngleY)  {
-
-
   //CHECK_GL(glUseProgram,m_ComputeId);
   // Let's do some error checking
   int result;
 //
-
-
   //CHECK_GL(glGetProgramiv,m_ComputeId, GL_ACTIVE_UNIFORMS, &result);
   //ALOGE("count of active uniforms%d",result);
 
@@ -782,11 +860,26 @@ void RendererCS::draw(float AngleX, float AngleY)  {
   //ALOGE("index location%d\n", texLocInCS);
  // ALOGE("index location 2 %d\n", texLocOutCS);
 
-  m_TextureNumber = m_TextureNumber % 50+ 1;
-  //loadTextureDataJPG(m_TextureNumber);
-  //loadTextureDataDXT(m_TextureNumber);
-  //loadTextureDataCRN(m_TextureNumber);
+  m_TextureNumber = m_TextureNumber % 100+ 1;
+#ifdef JPG
+  loadTextureDataJPG(m_TextureNumber);
+#endif
+
+#ifdef DXT1
+  loadTextureDataDXT(m_TextureNumber);
+#endif
+
+#ifdef CRN
+  loadTextureDataCRN(m_TextureNumber);
+#endif
+
+#ifdef ASTC4x4
   loadTextureDataASTC4x4(m_TextureNumber);
+#endif
+
+#ifdef ASTC8x8
+  loadTextureDataASTC8x8(m_TextureNumber);
+#endif
 
   //std::chrono::high_resolution_clock::time_point compute_start = std::chrono::high_resolution_clock::now();
   //CHECK_GL(glBindBufferBase,GL_SHADER_STORAGE_BUFFER, 0, m_ssbo);
@@ -822,9 +915,13 @@ void RendererCS::draw(float AngleX, float AngleY)  {
 
   CHECK_GL(glActiveTexture, GL_TEXTURE0);
 
+#ifdef JPG
+  CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureId2);
+#endif
 
+#ifndef JPG
   CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdCmp);
-
+#endif
   CHECK_GL(glEnableVertexAttribArray, posLoc);
   CHECK_GL(glBindBuffer, GL_ARRAY_BUFFER, m_VertexBuffer);
   CHECK_GL(glVertexAttribPointer,posLoc, 3, GL_FLOAT, GL_FALSE, 0, NULL);
@@ -850,25 +947,36 @@ void RendererCS::draw(float AngleX, float AngleY)  {
   CHECK_GL(glUseProgram, 0);
 
   m_numframes = m_numframes + 1;
-  if(m_numframes>=10){
+  if(m_numframes>=1){
 
       ull CPU_load, CPU_decode, GPU_Load, FPS;
-      if(!m_CPULoad.empty())
-          CPU_load = std::accumulate(m_CPULoad.begin(), m_CPULoad.end(), 0)/m_CPULoad.size();
+      ull GCPU_load, GCPU_decode, GGPU_Load, GFPS;
 
-      if(!m_CPUDecode.empty())
-          CPU_decode = std::accumulate(m_CPUDecode.begin(), m_CPUDecode.end(), 0)/m_CPUDecode.size();
+      if(!m_CPULoad.empty()) {
+          CPU_load = std::accumulate(m_CPULoad.begin(), m_CPULoad.end(), 0) / m_CPULoad.size();
 
-      if(!m_GPULoad.empty())
-          GPU_Load = std::accumulate(m_GPULoad.begin(), m_GPULoad.end(), 0)/m_GPULoad.size();
+      }
 
-      if(!m_TotalFps.empty())
-          FPS = std::accumulate(m_TotalFps.begin(), m_TotalFps.end(), 0)/m_TotalFps.size();
-      ALOGV("CPU Load Time : %lld--%d\n", CPU_load, m_CPULoad.size());
-      ALOGV("CPU Decode Time: %lld--%d\n", CPU_decode, m_CPUDecode.size());
-      ALOGV("GPU Load Time: %lld--%d\n", GPU_Load, m_GPULoad.size());
+      if(!m_CPUDecode.empty()) {
+          CPU_decode = std::accumulate(m_CPUDecode.begin(), m_CPUDecode.end(), 0) / m_CPUDecode.size();
 
-      ALOGV("FPS: %lld--%d\n", FPS, m_TotalFps.size());
+      }
+
+      if(!m_GPULoad.empty()) {
+          GPU_Load = std::accumulate(m_GPULoad.begin(), m_GPULoad.end(), 0) / m_GPULoad.size();
+
+      }
+
+      if(!m_TotalFps.empty()) {
+          FPS = std::accumulate(m_TotalFps.begin(), m_TotalFps.end(), 0) / m_TotalFps.size();
+
+      }
+
+      ALOGV("CPU Load Time : %lld--%d\n", CPU_load, m_TextureNumber);
+      ALOGV("CPU Decode Time: %lld--%d\n", CPU_decode, m_TextureNumber);
+      ALOGV("GPU Load Time: %lld--%d\n", GPU_Load, m_TextureNumber);
+      ALOGV("FPS: %lld--%d\n", FPS, m_TextureNumber);
+
       m_CPULoad.clear();
       m_CPUDecode.clear();
       m_GPULoad.clear();
@@ -928,7 +1036,7 @@ void RendererCS::drawDXT(float AngleX, float AngleY)   {
 
     CHECK_GL(glActiveTexture, GL_TEXTURE0);
 
-
+#define DXT
     CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdDXT);
 
     CHECK_GL(glCompressedTexSubImage2D, GL_TEXTURE_2D,    // Type of texture

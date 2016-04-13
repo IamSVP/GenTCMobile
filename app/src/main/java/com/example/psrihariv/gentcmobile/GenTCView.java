@@ -38,7 +38,7 @@ public class GenTCView extends GLSurfaceView {
 
         float x = e.getX();
         float y = e.getY();
-        Log.d("positions: ", "X:" +x + "--Y:" +y);
+       // Log.d("positions: ", "X:" +x + "--Y:" +y);
         switch(e.getAction()){
             case MotionEvent.ACTION_MOVE:
 

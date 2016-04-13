@@ -28,7 +28,7 @@
 #include "glm/gtx/transform.hpp"
 #include "crn_decomp.h"
 
-#define DEBUG
+
 
 #define LOG_TAG "GenTCJNI"
 #ifdef  DEBUG
@@ -41,9 +41,9 @@
 #endif
 
 
+
+
 #ifdef DEBUG
-
-
 
 static const char* getGLErrString(GLenum err){
 
@@ -94,12 +94,18 @@ public:
 
     void loadShaders(const char *VertexShader, const char *FragmentShader);
     void loadComputeShader(const char *ComputeShader, GLuint &computeId);
+
+    // Texture loading fucntions
     void loadTextureDataJPG(int img_num);
     void loadTextureDataDXT(int img_num);
     void loadTextureDataCRN(int img_num);
     void loadTextureDataPBO(const char *imgPath);
     void loadTextureDataASTC4x4(int img_num);
     void loadTextureDataASTC8x8(int img_num);
+    void loadTextureDataASTC12x12(int img_num);
+    void loadTextureDataETC1(int img_num);
+
+
     void resize(int w, int h);
     void draw(float AngleX, float AngleY );
     void drawDXT(float AngleX, float AngleY);
@@ -144,6 +150,11 @@ public:
     std::vector<ull> m_GPUDecode;
     std::vector<ull> m_TotalFps;
 
+    // Global
+    std::vector<ull> m_GCPULoad;
+    std::vector<ull> m_GGPULoad;
+    std::vector<ull> m_GCPUDecode;
+    std::vector<ull> m_GTotalFps;
 
     glm::vec3 m_camPosition;
     glm::vec3 m_camDirection;
