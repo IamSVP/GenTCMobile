@@ -29,6 +29,10 @@
 #include "crn_decomp.h"
 
 
+#include <media/NdkMediaCodec.h>
+#include <media/NdkMediaExtractor.h>
+
+#define DEBUG
 
 #define LOG_TAG "GenTCJNI"
 #ifdef  DEBUG
@@ -79,6 +83,23 @@ static const char* getGLErrString(GLenum err){
 
 typedef unsigned long long ull;
 
+typedef struct {
+    int fd;
+    AMediaExtractor* ex;
+    AMediaCodec *codec;
+    int64_t renderstart;
+    bool sawInputEOS;
+    bool sawOutputEOS;
+    bool isPlaying;
+    bool renderonce;
+} workerdata;
+
+workerdata data = {-1, NULL, NULL, 0, false, false, false, false};
+
+
+
+
+
 class RendererCS{
 
 public:
@@ -104,7 +125,7 @@ public:
     void loadTextureDataASTC8x8(int img_num);
     void loadTextureDataASTC12x12(int img_num);
     void loadTextureDataETC1(int img_num);
-
+    void loadMPEGFrame();
 
     void resize(int w, int h);
     void draw(float AngleX, float AngleY );
@@ -162,7 +183,11 @@ public:
     char m_TexturePath[256];
     char m_ObjPath[256];
     char m_MetricsPath[256];
+    char m_MpegPath[256];
     FILE *fpOutFile;
+    workerdata *d;
+
+
 
     const EGLContext m_EglContext;
 

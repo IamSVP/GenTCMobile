@@ -8,7 +8,8 @@
 #include "stb_image.h"
 #include <jni.h>
 #include <cstdlib>
-
+#include <unistd.h>
+#include <fcntl.h>
 const char *vVertexProg =
         "#version 310 es\n"
                 "precision mediump float;\n"
@@ -79,13 +80,15 @@ const char *vDXTComputeProg =
 
 static const int vImageWidth = 2560;
 static const int vImageHeight = 1280;
+
+
 #define COMPRESSED_RGBA_ASTC_4x4 0x93B0
 #define COMPRESSED_RGBA_ASTC_8x8 0x93B7
 #define COMPRESSED_RGBA_ASTC_12x12 0x93BD
 #define COMPRESSED_RGB8_ETC1 0x8D64
 #define SPHERE
 
-#define ASTC4x4
+//#define ASTC4x4
 //#define ASTC8x8
 //#define ASTC12x12
 #define ASTC
@@ -93,12 +96,17 @@ static const int vImageHeight = 1280;
 //#define DXT1
 //#define CRN
 //#define JPG
+#define MPEG
 
 static void printGlString(const char* name, GLenum s) {
     const char* v = (const char*)glGetString(s);
     ALOGE("GL %s: %s\n", name, v);
 }
-
+int64_t systemnanotime() {
+    timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return now.tv_sec * 1000000000LL + now.tv_nsec;
+}
 void RendererCS::loadShaders(const char *VertexShader, const char *FragmentShader){
 
   // Get Id's for the create shaders
@@ -153,6 +161,7 @@ void RendererCS::loadShaders(const char *VertexShader, const char *FragmentShade
 
 // Look up more on gl_context and egl context and how's it handled
 RendererCS::RendererCS():m_EglContext(eglGetCurrentContext()) {
+
 }
 
 void RendererCS::intializeShaderBuffers(){
@@ -216,6 +225,7 @@ void RendererCS::init(const char * path){
     sprintf(m_TexturePath,"%s/Textures",path);
     sprintf(m_ObjPath, "%s/Obj/sphere.obj", path);
     sprintf(m_MetricsPath, "%s/output.txt", path);
+    sprintf(m_MpegPath, "%s/360MegaCoaster2K.mp4", path);
     fpOutFile = fopen(m_MetricsPath, "r");
     ALOGE("Path obj %s\n", m_ObjPath);
     m_TextureNumber = 1;
@@ -307,6 +317,57 @@ void RendererCS::init(const char * path){
 #ifndef JPG
     initializeCompressedTexture();
 #endif
+
+
+#ifdef MPEG
+
+    initializeTexture();
+
+    int fd = open(m_MpegPath, O_RDONLY);
+    data.fd = fd;
+
+    d = &data;
+
+    AMediaExtractor *ex = AMediaExtractor_new();
+    media_status_t err = AMediaExtractor_setDataSourceFd(ex, d->fd, 0 , LONG_MAX);
+    close(d->fd);
+    if (err != AMEDIA_OK) {
+        ALOGE("setDataSource error: %d", err);
+    }
+    int numtracks = AMediaExtractor_getTrackCount(ex);
+
+    AMediaCodec *codec = NULL;
+
+    ALOGV("input has %d tracks", numtracks);
+
+    for (int i = 0; i <= 0; i++) {
+        AMediaFormat *format = AMediaExtractor_getTrackFormat(ex, i);
+        const char *s = AMediaFormat_toString(format);
+        ALOGV("track %d format: %s", i, s);
+        const char *mime;
+        if (!AMediaFormat_getString(format, AMEDIAFORMAT_KEY_MIME, &mime)) {
+            ALOGV("no mime type");
+//            return JNI_FALSE;
+        } else if (!strncmp(mime, "video/", 6)) {
+            // Omitting most error handling for clarity.
+            // Production code should check for errors.
+            AMediaExtractor_selectTrack(ex, i);
+            codec = AMediaCodec_createDecoderByType(mime);
+            AMediaCodec_configure(codec, format, NULL, NULL, 0);
+            d->ex = ex;
+            d->codec = codec;
+            d->renderstart = -1;
+            d->sawInputEOS = false;
+            d->sawOutputEOS = false;
+            d->isPlaying = false;
+            d->renderonce = true;
+            AMediaCodec_start(codec);
+        }
+        AMediaFormat_delete(format);
+    }
+#endif
+
+
     posLoc = CHECK_GL(glGetAttribLocation,m_ProgramId, "position");
     assert ( posLoc >= 0 );
 
@@ -324,7 +385,98 @@ void RendererCS::init(const char * path){
 
     matrixID = CHECK_GL(glGetUniformLocation, m_ProgramId, "MVP");
     assert(matrixID >= 0);
+}
 
+void RendererCS::loadMPEGFrame() {
+
+    ssize_t bufidx = -1;
+    ssize_t outbufidx = -1;
+    uint8_t *TextureData = NULL;
+    size_t TexSz = 0;
+    if (!d->sawInputEOS) {
+        bufidx = AMediaCodec_dequeueInputBuffer(d->codec, -1);
+        ALOGE("input buffer %zd---------", bufidx);
+        if (bufidx >= 0) {
+
+            size_t bufsize;
+            uint8_t *buf = AMediaCodec_getInputBuffer(d->codec, bufidx, &bufsize);
+            ssize_t sampleSize = AMediaExtractor_readSampleData(d->ex, buf, bufsize);
+
+            if (sampleSize < 0) {
+                sampleSize = 0;
+                d->sawInputEOS = true;
+                ALOGV("EOS");
+            }
+            int64_t presentationTimeUs = AMediaExtractor_getSampleTime(d->ex);
+
+            AMediaCodec_queueInputBuffer(d->codec, bufidx, 0, sampleSize, presentationTimeUs,
+                                         d->sawInputEOS ? AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM : 0);
+            ALOGE("sample size buffer %zd----------------", sampleSize);
+
+            AMediaExtractor_advance(d->ex);
+        }
+
+
+    }
+
+    if (!d->sawOutputEOS) {
+        AMediaCodecBufferInfo info;
+        ALOGE("fucking waiting here...\n");
+        ssize_t status = AMediaCodec_dequeueOutputBuffer(d->codec, &info, -1);
+        if (status >= 0) {
+            if (info.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) {
+                ALOGV("output EOS");
+                d->sawOutputEOS = true;
+            }
+            TextureData = AMediaCodec_getOutputBuffer(d->codec, status, &TexSz);
+            AMediaCodec_releaseOutputBuffer(d->codec, status, info.size != 0);
+            int64_t presentationNano = info.presentationTimeUs * 1000;
+            if (d->renderstart < 0) {
+                d->renderstart = systemnanotime() - presentationNano;
+            }
+            int64_t delay = (d->renderstart + presentationNano) - systemnanotime();
+            if (delay > 0) {
+                usleep(delay / 1000);
+            }
+
+            if (d->renderonce) {
+                d->renderonce = false;
+                return;
+            }
+        } else if (status == AMEDIACODEC_INFO_OUTPUT_BUFFERS_CHANGED) {
+            ALOGV("output buffers changed");
+        } else if (status == AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED) {
+            AMediaFormat *format = NULL;
+            format = AMediaCodec_getOutputFormat(d->codec);
+            ALOGV("format changed to: %s", AMediaFormat_toString(format));
+            AMediaFormat_delete(format);
+        } else if (status == AMEDIACODEC_INFO_TRY_AGAIN_LATER) {
+            ALOGV("no output buffer right now");
+        } else {
+            ALOGV("unexpected info code: %zd", status);
+        }
+
+
+        // GPU Loading........
+        ALOGV("Checking frame size %lld\n", TexSz);
+        std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
+        CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureId2);
+
+        CHECK_GL(glTexSubImage2D, GL_TEXTURE_2D,
+                 0,
+                 0, 0,
+                 vImageWidth,
+                 vImageHeight,
+                 GL_RGBA,
+                 GL_UNSIGNED_BYTE,
+                 TextureData);
+        std::chrono::high_resolution_clock::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
+        std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                GPULoad_End - GPULoad_Start);
+        m_GPULoad.push_back(GPULoad_Time.count());
+
+        CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
+    }
 }
 
 void RendererCS::resize(int w, int h){
@@ -446,8 +598,6 @@ void RendererCS::initializeCompressedTexture()   {
 
 }
 
-
-
 void RendererCS::loadTextureDataDXT(int img_num)  {
 
     unsigned char *blocks;
@@ -456,7 +606,7 @@ void RendererCS::loadTextureDataDXT(int img_num)  {
         ALOGE("Block is NULL\n");
     char img_path[256];
 
-    sprintf(img_path, "%s/360MegaCoaster2k/DXT1/360MegaCoaster2k%06d.DXT1",m_TexturePath,img_num);
+    sprintf(img_path, "%s/360MegaCoaster720/DXT1/360MegaCoaster720%06d.DXT1",m_TexturePath,img_num);
     ALOGE("Path %s", img_path);
 
     FILE *fp = fopen(img_path, "rb");
@@ -570,19 +720,21 @@ void RendererCS::loadTextureDataCRN(int img_num)  {
     ALOGE("here3..\n");
     crnd::crnd_unpack_context pContext = crnd::crnd_unpack_begin(pSrc_file_data, src_file_size);
 
+
+
+
+    ALOGE("here2...\n");
+
+    void *TextureData;
+    TextureData = malloc(vImageWidth*vImageHeight / 2);
+ crnd::crnd_unpack_level(pContext, &TextureData, total_face_size, row_pitch,0);
     std::chrono::high_resolution_clock::time_point CPUDecode_End = std::chrono::high_resolution_clock::now();
 
     std::chrono::nanoseconds CPUDecode_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPUDecode_End - CPUDecode_Start);
     m_CPUDecode.push_back(CPUDecode_Time.count());
-
-
-    ALOGE("here2...\n");
-    //GPU Loading.......
-    void *TextureData;
-    TextureData = malloc(vImageWidth*vImageHeight / 2);
-
+     //GPU Loading.......
     std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
-    crnd::crnd_unpack_level(pContext, &TextureData, total_face_size, row_pitch,0);
+
     if(TextureData == NULL) ALOGE("Texture Data is Null\n");
     CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdCmp);
     CHECK_GL(glCompressedTexSubImage2D, GL_TEXTURE_2D,    // Type of texture
@@ -604,6 +756,7 @@ void RendererCS::loadTextureDataCRN(int img_num)  {
     free(TextureData);
 
 }
+
 void RendererCS::loadTextureDataASTC4x4(int img_num) {
 
     unsigned char *blocks;
@@ -612,7 +765,7 @@ void RendererCS::loadTextureDataASTC4x4(int img_num) {
 
     char img_path[256];
 
-    sprintf(img_path, "%s/360MegaCoaster2k/ASTC4x4/360MegaCoaster2k%06d.astc",m_TexturePath,img_num);
+    sprintf(img_path, "%s/360MegaCoaster720/ASTC4x4/360MegaCoaster720%06d.astc",m_TexturePath,img_num);
     ALOGE("Path %s", img_path);
     unsigned char t[16];
     FILE *fp = fopen(img_path, "rb");
@@ -662,29 +815,32 @@ void RendererCS::loadTextureDataASTC4x4(int img_num) {
     fclose(fp);
 
 }
+
 void RendererCS::loadTextureDataASTC8x8(int img_num) {
 
     unsigned char *blocks;
-    size_t  TexSz = vImageHeight * vImageWidth/4;
-    blocks = (unsigned char *)malloc( sizeof(unsigned char) * TexSz);
+    size_t TexSz = vImageHeight * vImageWidth / 4;
+    blocks = (unsigned char *) malloc(sizeof(unsigned char) * TexSz);
 
     char img_path[256];
 
-    sprintf(img_path, "%s/360MegaCoaster2k/ASTC8x8/360MegaCoaster2k%06d.astc",m_TexturePath,img_num);
+    sprintf(img_path, "%s/360MegaCoaster720/ASTC8x8/360MegaCoaster720%06d.astc", m_TexturePath,
+            img_num);
     ALOGE("Path %s", img_path);
 
     FILE *fp = fopen(img_path, "rb");
     ALOGE("Path %s", img_path);
     unsigned char t[16];
 
-    fread(t,1,16,fp);
+    fread(t, 1, 16, fp);
     std::chrono::high_resolution_clock::time_point CPULoad_Start = std::chrono::high_resolution_clock::now();
 
-    if(fread(blocks, 1, TexSz, fp) <= 0)
+    if (fread(blocks, 1, TexSz, fp) <= 0)
         ALOGE("Block is NULL\n");
     std::chrono::high_resolution_clock::time_point CPULoad_End = std::chrono::high_resolution_clock::now();
 
-    std::chrono::nanoseconds CPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPULoad_End - CPULoad_Start);
+    std::chrono::nanoseconds CPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            CPULoad_End - CPULoad_Start);
     m_CPULoad.push_back(CPULoad_Time.count());
 
 
@@ -710,8 +866,9 @@ void RendererCS::loadTextureDataASTC8x8(int img_num) {
              TexSz, // Type of texture data
              blocks);
 
-    std::chrono::high_resolution_clock ::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
-    std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
+    std::chrono::high_resolution_clock::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
+    std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            GPULoad_End - GPULoad_Start);
     m_GPULoad.push_back(GPULoad_Time.count());
 
     // CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, 0);
@@ -785,7 +942,7 @@ void RendererCS::loadTextureDataASTC12x12(int img_num){
 void RendererCS::loadTextureDataJPG(int img_num)   {
 
     char img_path[256];
-    sprintf(img_path, "%s/360MegaCoaster2k/JPG/360MegaCoaster2k%06d.jpg",m_TexturePath,img_num);
+    sprintf(img_path, "%s/360MegaCoaster720/JPG/360MegaCoaster720%06d.jpg",m_TexturePath,img_num);
     ALOGE("Path%s", img_path);
     int w,h,n;
 
@@ -881,6 +1038,10 @@ void RendererCS::draw(float AngleX, float AngleY)  {
   loadTextureDataASTC8x8(m_TextureNumber);
 #endif
 
+#ifdef MPEG
+    loadMPEGFrame();
+#endif
+
   //std::chrono::high_resolution_clock::time_point compute_start = std::chrono::high_resolution_clock::now();
   //CHECK_GL(glBindBufferBase,GL_SHADER_STORAGE_BUFFER, 0, m_ssbo);
   //CHECK_GL(glBufferData, GL_SHADER_STORAGE_BUFFER, sizeof(scale), scale, GL_DYNAMIC_COPY);
@@ -909,17 +1070,17 @@ void RendererCS::draw(float AngleX, float AngleY)  {
     m_MVP = m_Projection * m_View * m_Scaling;
 
 
-  CHECK_GL(glUseProgram,m_ProgramId);
-  CHECK_GL(glClear,GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+  CHECK_GL(glUseProgram, m_ProgramId);
+  CHECK_GL(glClear, GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
   CHECK_GL(glUniformMatrix4fv, matrixID, 1, GL_FALSE, &m_MVP[0][0]);
 
   CHECK_GL(glActiveTexture, GL_TEXTURE0);
 
-#ifdef JPG
+#ifdef MPEG
   CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureId2);
 #endif
 
-#ifndef JPG
+#ifndef MPEG
   CHECK_GL(glBindTexture, GL_TEXTURE_2D, m_TextureIdCmp);
 #endif
   CHECK_GL(glEnableVertexAttribArray, posLoc);
@@ -947,7 +1108,7 @@ void RendererCS::draw(float AngleX, float AngleY)  {
   CHECK_GL(glUseProgram, 0);
 
   m_numframes = m_numframes + 1;
-  if(m_numframes>=1){
+  if(m_numframes >= 10){
 
       ull CPU_load, CPU_decode, GPU_Load, FPS;
       ull GCPU_load, GCPU_decode, GGPU_Load, GFPS;
@@ -972,10 +1133,10 @@ void RendererCS::draw(float AngleX, float AngleY)  {
 
       }
 
-      ALOGV("CPU Load Time : %lld--%d\n", CPU_load, m_TextureNumber);
-      ALOGV("CPU Decode Time: %lld--%d\n", CPU_decode, m_TextureNumber);
-      ALOGV("GPU Load Time: %lld--%d\n", GPU_Load, m_TextureNumber);
-      ALOGV("FPS: %lld--%d\n", FPS, m_TextureNumber);
+      ALOGV("CPU Load Time : %lld--%d\n", CPU_load, m_CPULoad.size());
+      ALOGV("CPU Decode Time: %lld--%d\n", CPU_decode, m_CPUDecode.size());
+      ALOGV("GPU Load Time: %lld--%d\n", GPU_Load, m_GPULoad.size());
+      ALOGV("FPS: %lld--%d\n", FPS, m_TotalFps.size());
 
       m_CPULoad.clear();
       m_CPUDecode.clear();
