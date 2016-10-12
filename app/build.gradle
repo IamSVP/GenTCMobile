@@ -22,7 +22,7 @@ model {
 
     android.ndk {
         moduleName  = "GenTCjni"
-        cppFlags.addAll(["-std=c++11", "-Wno-error", "-fno-rtti", "-fno-exceptions"])
+        cppFlags.addAll(["-std=c++11", "-Wno-error", "-fno-rtti", "-fno-exceptions","-lpthread"])
         cppFlags.addAll(["-I${file("src/main/jni/ObjLoader")}".toString() ])
         cppFlags.addAll(["-I${file("src/main/jni/native_app_glue")}".toString(),
                          "-I${file("src/main/jni/cpufeatures")}".toString(),

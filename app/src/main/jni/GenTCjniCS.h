@@ -20,6 +20,7 @@
 #include <iostream>
 #include <fstream>
 #include <stdio.h>
+#include <fstream>
 
 #include "ObjLoader/objloader.hpp"
 #include "ObjLoader/vboindexer.hpp"
@@ -88,6 +89,7 @@ public:
     RendererCS();
 
     void initializeTexture();
+    void initializeMPTCTexture();
     void initializeScene();
     void intializeShaderBuffers();
     void initializeCompressedTexture();
@@ -156,12 +158,15 @@ public:
     std::vector<ull> m_GCPUDecode;
     std::vector<ull> m_GTotalFps;
 
+    //
+    std::ifstream m_mptc_stream;
     glm::vec3 m_camPosition;
     glm::vec3 m_camDirection;
     float scale[100];
     char m_TexturePath[256];
     char m_ObjPath[256];
     char m_MetricsPath[256];
+    std::string m_mptc_file_path;
     FILE *fpOutFile;
 
     const EGLContext m_EglContext;

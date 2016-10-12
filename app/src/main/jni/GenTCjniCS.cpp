@@ -3,6 +3,7 @@
 //
 
 #include "GenTCjniCS.h"
+#include "decoder.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -216,6 +217,12 @@ void RendererCS::init(const char * path){
     sprintf(m_TexturePath,"%s/Textures",path);
     sprintf(m_ObjPath, "%s/Obj/sphere.obj", path);
     sprintf(m_MetricsPath, "%s/output.txt", path);
+
+
+    //set MPTC file Path
+    m_mptc_file_path = std::string(path) + "/360MegaC4K.mpt";
+
+
     fpOutFile = fopen(m_MetricsPath, "r");
     ALOGE("Path obj %s\n", m_ObjPath);
     m_TextureNumber = 1;
@@ -446,7 +453,9 @@ void RendererCS::initializeCompressedTexture()   {
 
 }
 
+void RendererCS::initializeMPTCTexture() {
 
+}
 
 void RendererCS::loadTextureDataDXT(int img_num)  {
 
