@@ -20,7 +20,7 @@
 #include <iostream>
 #include <fstream>
 #include <stdio.h>
-#include <fstream>
+
 
 #include "ObjLoader/objloader.hpp"
 #include "ObjLoader/vboindexer.hpp"
@@ -28,8 +28,13 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/transform.hpp"
 #include "crn_decomp.h"
+#include "decoder.h"
 
 
+#include <media/NdkMediaCodec.h>
+#include <media/NdkMediaExtractor.h>
+
+#define DEBUG
 
 #define LOG_TAG "GenTCJNI"
 #ifdef  DEBUG
@@ -80,6 +85,23 @@ static const char* getGLErrString(GLenum err){
 
 typedef unsigned long long ull;
 
+typedef struct {
+    int fd;
+    AMediaExtractor* ex;
+    AMediaCodec *codec;
+    int64_t renderstart;
+    bool sawInputEOS;
+    bool sawOutputEOS;
+    bool isPlaying;
+    bool renderonce;
+} workerdata;
+
+workerdata data = {-1, NULL, NULL, 0, false, false, false, false};
+
+
+
+
+
 class RendererCS{
 
 public:
@@ -101,12 +123,13 @@ public:
     void loadTextureDataJPG(int img_num);
     void loadTextureDataDXT(int img_num);
     void loadTextureDataCRN(int img_num);
+    void loadTextureDataMPTC();
     void loadTextureDataPBO(const char *imgPath);
     void loadTextureDataASTC4x4(int img_num);
     void loadTextureDataASTC8x8(int img_num);
     void loadTextureDataASTC12x12(int img_num);
     void loadTextureDataETC1(int img_num);
-
+    void loadMPEGFrame();
 
     void resize(int w, int h);
     void draw(float AngleX, float AngleY );
@@ -159,7 +182,7 @@ public:
     std::vector<ull> m_GTotalFps;
 
     //
-    std::ifstream m_mptc_stream;
+
     glm::vec3 m_camPosition;
     glm::vec3 m_camDirection;
     float scale[100];
@@ -167,7 +190,17 @@ public:
     char m_ObjPath[256];
     char m_MetricsPath[256];
     std::string m_mptc_file_path;
+    uint32_t num_blocks;
+    char m_MpegPath[256];
     FILE *fpOutFile;
+    workerdata *d;
+
+    BufferStruct *ptr_buffer_struct;
+    std::ifstream m_mptc_stream;
+    PhysicalDXTBlock *curr_dxt;
+    PhysicalDXTBlock *prev_dxt;
+    PhysicalDXTBlock *temp_dxt;
+    MPTCDecodeInfo *ptr_decode_info;
 
     const EGLContext m_EglContext;
 

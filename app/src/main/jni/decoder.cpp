@@ -209,10 +209,12 @@ void ReconstructDXTFrame(uint32_t *unique_indices,
   int32_t blocks_width = decode_info->frame_width/4;
   uint32_t curr_unique_idx = 0;
   uint8_t search_area = decode_info->search_area;
-  for(int32_t physical_idx = 0; physical_idx < decode_info->num_blocks; physical_idx++) {
+  int32_t ref_physical_idx;
+  int32_t physical_idx;
+  for( physical_idx = 0; physical_idx < decode_info->num_blocks; physical_idx++) {
     uint8_t x = decode_info->motion_indices[2 * physical_idx];
     uint8_t y = decode_info->motion_indices[2 * physical_idx + 1];
-
+    ALOGE("In reconstrcut index")
     if(x == 255 && y == 255) {
       assert(curr_unique_idx < num_unique);
       assert( unique_indices != NULL && "Unique Indies pointer cannot be null");
@@ -245,7 +247,7 @@ void ReconstructDXTFrame(uint32_t *unique_indices,
         int32_t ref_block_x = curr_block_x + motion_x;
         int32_t ref_block_y = curr_block_y + motion_y;
 
-        int32_t ref_physical_idx = ref_block_y * blocks_width + ref_block_x;
+        ref_physical_idx = ref_block_y * blocks_width + ref_block_x;
 	curr_dxt[physical_idx].interp = curr_dxt[ref_physical_idx].interp;
     }
   }
@@ -253,7 +255,7 @@ void ReconstructDXTFrame(uint32_t *unique_indices,
 
 int GetFrame(std::ifstream &in_stream, PhysicalDXTBlock *prev_dxt, PhysicalDXTBlock *curr_dxt, 
             MPTCDecodeInfo *decode_info) {
-
+  ALOGE("HEREREEEEEEEE\n");
   if(!in_stream.is_open()) {
     std::cerr << "Error opening file!" << std::endl;
     exit(-1);
@@ -265,7 +267,7 @@ int GetFrame(std::ifstream &in_stream, PhysicalDXTBlock *prev_dxt, PhysicalDXTBl
   }
   // This is the start read all the frame meta data once and store it in the DecodeInfo for 
   // decoding further frames
-  
+  ALOGE("HEREREEEEEEEE\n");
   if(decode_info->is_start) {
 
     in_stream.read(reinterpret_cast<char*>(&(decode_info->frame_height)), 4);
@@ -281,7 +283,7 @@ int GetFrame(std::ifstream &in_stream, PhysicalDXTBlock *prev_dxt, PhysicalDXTBl
     in_stream.read(reinterpret_cast<char*>(&(decode_info->max_compressed_ep_C)), 4);
     decode_info->is_unique = true;
     decode_info->curr_frame = 0;
-
+    ALOGE("HEREREEEEEEEE\n");
     // malloc memories to be used for further decoding of all the frames
     decode_info->comp_palette = (uint8_t*)(malloc(decode_info->max_compressed_palette));
     decode_info->uncomp_palette = (uint8_t*)(malloc(decode_info->max_unique_count));
@@ -568,7 +570,7 @@ void GetFrameMultiThread(std::ifstream &in_stream,
   // Wait for motion indices to be decoded
   if(motion_decode.joinable())
     motion_decode.join();
-  else std::cout << "motion decode thread join error!" << std::endl;
+  else ALOGE("motion decode thread join error!");
 
    std::thread reconstruct_interp(ReconstructDXTFrame,
       reinterpret_cast<uint32_t*>(decode_info->uncomp_palette + decode_info->unique_idx_offset),
@@ -577,6 +579,8 @@ void GetFrameMultiThread(std::ifstream &in_stream,
       prev_dxt,
       curr_dxt
       );
+
+
 
 
    // Wait for ep1 Y and C decoding
@@ -651,7 +655,7 @@ int InitBufferedDecode(uint8_t buffer_sz,
   
   // Decode Info
   assert(2 < buffer_sz && buffer_sz < 20 && "!!Buffer Size too Big!!\n");
-
+  ALOGE("Here tooo.....");
   ptr_buffer_struct->ptr_decode_info = (MPTCDecodeInfo*)malloc(sizeof(MPTCDecodeInfo));
   ptr_buffer_struct->ptr_decode_info->is_start = true;
   ptr_buffer_struct->buffer_sz = buffer_sz; 

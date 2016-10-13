@@ -26,13 +26,16 @@ public class GenTCView extends GLSurfaceView {
         setEGLContextClientVersion(2);
         m_AngleX = 0.0f;
         m_AngleY = 0.0f;
-        setRenderer(new Renderer());
+        setRenderer(new Renderer(this));
+
     }
     public void getpath(String path){
         Log.d("got string", path);
         this.path = path;
     }
-
+    public void invalidateFrame(){
+        this.invalidate();
+    }
     @Override
     public boolean onTouchEvent(MotionEvent e){
 
@@ -73,9 +76,15 @@ public class GenTCView extends GLSurfaceView {
     static float m_AngleY;
 
     private static class Renderer implements GLSurfaceView.Renderer {
+        GLSurfaceView p;
+        public Renderer(GLSurfaceView parent){
+            p = parent;
+        }
         public void onDrawFrame(GL10 gl) {
 
             GenTCJNILib.draw(m_AngleX, m_AngleY);
+            p.setRenderMode(GLSurfaceView.RENDERMODE_CONTINUOUSLY);
+            //p.invalidate
 
         }
 
