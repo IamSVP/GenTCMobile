@@ -40,13 +40,13 @@ static void ycocg667_to_rgb565(const int8_t *in, int8_t *out) {
 }
 
 
-void EntropyDecode(uint8_t *compressed_data, 
-                   uint8_t *out_symbols, 
+void EntropyDecode(std::vector<uint8_t> &compressed_data,
+                   std::vector<uint8_t> &out_symbols,
 		   uint32_t compressed_size,
 		   uint32_t out_size,
 		   bool is_bit_model) {
 
-  entropy::Arithmetic_Codec arith_decoder(compressed_size + 100, compressed_data);
+  entropy::Arithmetic_Codec arith_decoder(compressed_size + 100, compressed_data.data());
   if(!is_bit_model) {
     entropy::Adaptive_Data_Model model(257);
     arith_decoder.start_decoder();
@@ -114,9 +114,9 @@ void ReconstructEndpoints(MPTCDecodeInfo *decode_info,
 
   if(ep_number == 1) {
     //endpoint 1
-    IWavelet2D(decode_info->wav_ep1_Y, decode_info->ep1_Y, width, height);
-    IWavelet2D(decode_info->wav_ep1_C, decode_info->ep1_Co, width, height);
-    IWavelet2D(decode_info->wav_ep1_C + num_blocks, decode_info->ep1_Cg, width, height);
+    IWavelet2D(decode_info->wav_ep1_Y.data(), decode_info->ep1_Y.data(), width, height);
+    IWavelet2D(decode_info->wav_ep1_C.data(), decode_info->ep1_Co.data(), width, height);
+    IWavelet2D(decode_info->wav_ep1_C.data() + num_blocks, decode_info->ep1_Cg.data(), width, height);
 
     for (size_t j = 0; j < height; ++j) {
       for (size_t i = 0; i < width; ++i) {
@@ -154,9 +154,9 @@ void ReconstructEndpoints(MPTCDecodeInfo *decode_info,
 
   } else if(ep_number == 2) {
     // endpoint 2
-    IWavelet2D(decode_info->wav_ep2_Y, decode_info->ep2_Y, width, height);
-    IWavelet2D(decode_info->wav_ep2_C, decode_info->ep2_Co, width, height);
-    IWavelet2D(decode_info->wav_ep2_C + num_blocks, decode_info->ep2_Cg, width, height);
+    IWavelet2D(decode_info->wav_ep2_Y.data(), decode_info->ep2_Y.data(), width, height);
+    IWavelet2D(decode_info->wav_ep2_C.data(), decode_info->ep2_Co.data(), width, height);
+    IWavelet2D(decode_info->wav_ep2_C.data() + num_blocks, decode_info->ep2_Cg.data(), width, height);
     
 
     for(size_t j = 0; j < height; ++j) {
@@ -285,25 +285,57 @@ int GetFrame(std::ifstream &in_stream, PhysicalDXTBlock *prev_dxt, PhysicalDXTBl
     decode_info->curr_frame = 0;
     ALOGE("HEREREEEEEEEE\n");
     // malloc memories to be used for further decoding of all the frames
-    decode_info->comp_palette = (uint8_t*)(malloc(decode_info->max_compressed_palette));
-    decode_info->uncomp_palette = (uint8_t*)(malloc(decode_info->max_unique_count));
-    decode_info->comp_motion_indices = (uint8_t*)(malloc(decode_info->max_compressed_motion_indices));
-    decode_info->motion_indices = (uint8_t*)(malloc(2 * decode_info->num_blocks));
-    decode_info->comp_ep_Y = (uint8_t*)(malloc(decode_info->max_compressed_ep_Y));
-    decode_info->comp_ep_C = (uint8_t*)(malloc(decode_info->max_compressed_ep_C));
+    std::vector<uint8_t > temp(100);
+    assert(temp.data() != NULL);
 
-    decode_info->wav_ep1_Y = (uint8_t*)(malloc(decode_info->num_blocks));
-    decode_info->wav_ep1_C = (uint8_t*)(malloc(2 * decode_info->num_blocks));
+    decode_info->comp_palette.resize(decode_info->max_compressed_palette, 0);
+    assert(decode_info->comp_palette.data() != NULL);
 
-    decode_info->wav_ep2_Y = (uint8_t*)(malloc(decode_info->num_blocks));
-    decode_info->wav_ep2_C = (uint8_t*)(malloc(2 * decode_info->num_blocks));
+    decode_info->uncomp_palette.resize(decode_info->max_unique_count, 0);
+    assert(decode_info->uncomp_palette.data() != NULL);
 
-    decode_info->ep1_Y = (int8_t*)(malloc(decode_info->num_blocks));
-    decode_info->ep2_Y = (int8_t*)(malloc(decode_info->num_blocks));
-    decode_info->ep1_Co = (int8_t*)(malloc(decode_info->num_blocks));
-    decode_info->ep2_Co = (int8_t*)(malloc(decode_info->num_blocks));
-    decode_info->ep1_Cg = (int8_t*)(malloc(decode_info->num_blocks));
-    decode_info->ep2_Cg = (int8_t*)(malloc(decode_info->num_blocks));
+    decode_info->comp_motion_indices.resize(decode_info->max_compressed_motion_indices, 0);
+    assert(decode_info->comp_motion_indices.data() != NULL);
+
+    decode_info->motion_indices.resize(2 * decode_info->num_blocks, 0);
+    assert(decode_info->motion_indices.data() != NULL);
+
+    decode_info->comp_ep_Y.resize(decode_info->max_compressed_ep_Y, 0);
+    assert(decode_info->comp_ep_Y.data() != NULL);
+
+    decode_info->comp_ep_C.resize(decode_info->max_compressed_ep_C, 0);
+    assert(decode_info->comp_ep_C.data() != NULL);
+
+    decode_info->wav_ep1_Y.resize(decode_info->num_blocks, 0);
+    assert(decode_info->wav_ep1_Y.data() != NULL);
+
+    decode_info->wav_ep1_C.resize(2 * decode_info->num_blocks, 0);
+    assert(decode_info->wav_ep1_C.data() != NULL);
+
+    decode_info->wav_ep2_Y.resize(decode_info->num_blocks, 0);
+    assert(decode_info->wav_ep2_Y.data() != NULL);
+
+    decode_info->wav_ep2_C.resize(2 * decode_info->num_blocks, 0);
+    assert(decode_info->wav_ep2_C.data() != NULL);
+
+    decode_info->ep1_Y.resize(decode_info->num_blocks, 0);
+    assert(decode_info->ep1_Y.data() != NULL);
+
+    decode_info->ep2_Y.resize(decode_info->num_blocks, 0);
+    assert(decode_info->ep2_Y.data() != NULL);
+
+    decode_info->ep1_Co.resize((decode_info->num_blocks, 0));
+    assert(decode_info->ep1_Co.data() != NULL);
+
+    decode_info->ep2_Co.resize(decode_info->num_blocks, 0);
+    assert(decode_info->ep2_Co.data() != NULL);
+
+    decode_info->ep1_Cg.resize(decode_info->num_blocks, 0);
+    assert(decode_info->ep1_Cg.data() != NULL);
+
+    decode_info->ep2_Cg.resize(decode_info->num_blocks,0);
+    assert(decode_info->ep2_Cg.data() != NULL);
+
     decode_info->is_start = false;
 
   }
@@ -316,10 +348,10 @@ int GetFrame(std::ifstream &in_stream, PhysicalDXTBlock *prev_dxt, PhysicalDXTBl
     decode_info->curr_idx = 0;
     uint32_t compressed_palette_size;
     in_stream.read(reinterpret_cast<char*>(&compressed_palette_size), 4);
-    in_stream.read(reinterpret_cast<char*>(decode_info->comp_palette), compressed_palette_size);
+    in_stream.read(reinterpret_cast<char*>(decode_info->comp_palette.data()), compressed_palette_size);
     uint32_t unique_count;
     in_stream.read(reinterpret_cast<char*>(&unique_count), 4);
-    assert(decode_info->comp_palette != NULL && decode_info->uncomp_palette != NULL);
+    assert(decode_info->comp_palette.data() != NULL && decode_info->uncomp_palette.data() != NULL);
 
     EntropyDecode(decode_info->comp_palette, decode_info->uncomp_palette,
                   compressed_palette_size, unique_count, false);
@@ -333,11 +365,11 @@ int GetFrame(std::ifstream &in_stream, PhysicalDXTBlock *prev_dxt, PhysicalDXTBl
   // Decode a single frame
   uint32_t num_unique;
   in_stream.read(reinterpret_cast<char*>(&num_unique), 4);
-  uint32_t *unique_indices = reinterpret_cast<uint32_t*>(decode_info->uncomp_palette + decode_info->unique_idx_offset);
+  uint32_t *unique_indices = reinterpret_cast<uint32_t*>(decode_info->uncomp_palette.data() + decode_info->unique_idx_offset);
 
   uint32_t comp_motion_indices_sz;
   in_stream.read(reinterpret_cast<char*>(&comp_motion_indices_sz), 4);
-  in_stream.read(reinterpret_cast<char*>(decode_info->comp_motion_indices), comp_motion_indices_sz);
+  in_stream.read(reinterpret_cast<char*>(decode_info->comp_motion_indices.data()), comp_motion_indices_sz);
    
   EntropyDecode(decode_info->comp_motion_indices,
                 decode_info->motion_indices,
@@ -347,7 +379,7 @@ int GetFrame(std::ifstream &in_stream, PhysicalDXTBlock *prev_dxt, PhysicalDXTBl
 
   uint32_t comp_Y_sz, comp_C_sz;
   in_stream.read(reinterpret_cast<char*>(&comp_Y_sz), 4);
-  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep_Y), comp_Y_sz);
+  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep_Y.data()), comp_Y_sz);
   EntropyDecode(decode_info->comp_ep_Y,
                 decode_info->wav_ep1_Y,
 		comp_Y_sz,
@@ -356,7 +388,7 @@ int GetFrame(std::ifstream &in_stream, PhysicalDXTBlock *prev_dxt, PhysicalDXTBl
 
 
   in_stream.read(reinterpret_cast<char*>(&comp_C_sz), 4);
-  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep_C), comp_C_sz);
+  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep_C.data()), comp_C_sz);
   EntropyDecode(decode_info->comp_ep_C,
                 decode_info->wav_ep1_C,
 		comp_C_sz,
@@ -364,7 +396,7 @@ int GetFrame(std::ifstream &in_stream, PhysicalDXTBlock *prev_dxt, PhysicalDXTBl
 		false);
 
   in_stream.read(reinterpret_cast<char*>(&comp_Y_sz), 4);
-  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep_Y), comp_Y_sz);
+  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep_Y.data()), comp_Y_sz);
   EntropyDecode(decode_info->comp_ep_Y,
                 decode_info->wav_ep2_Y,
 		comp_Y_sz,
@@ -373,7 +405,7 @@ int GetFrame(std::ifstream &in_stream, PhysicalDXTBlock *prev_dxt, PhysicalDXTBl
 
 
   in_stream.read(reinterpret_cast<char*>(&comp_C_sz), 4);
-  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep_C), comp_C_sz);
+  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep_C.data()), comp_C_sz);
   EntropyDecode(decode_info->comp_ep_C,
                 decode_info->wav_ep2_C,
 		comp_C_sz,
@@ -382,7 +414,7 @@ int GetFrame(std::ifstream &in_stream, PhysicalDXTBlock *prev_dxt, PhysicalDXTBl
               
   // Interpolation Data
   ReconstructDXTFrame(
-      reinterpret_cast<uint32_t*>(decode_info->uncomp_palette + decode_info->unique_idx_offset),
+      reinterpret_cast<uint32_t*>(decode_info->uncomp_palette.data() + decode_info->unique_idx_offset),
       num_unique,
       decode_info,
       prev_dxt,
@@ -449,30 +481,32 @@ void GetFrameMultiThread(std::ifstream &in_stream,
     decode_info->is_multi_thread = true;
 
     // malloc memories to be used for further decoding of all the frames
-    decode_info->comp_palette = (uint8_t*)(malloc(decode_info->max_compressed_palette));
-    decode_info->uncomp_palette = (uint8_t*)(malloc(decode_info->max_unique_count));
-    decode_info->comp_motion_indices = (uint8_t*)(malloc(decode_info->max_compressed_motion_indices));
-    decode_info->motion_indices = (uint8_t*)(malloc(2 * decode_info->num_blocks));
+    decode_info->comp_palette.resize(decode_info->max_compressed_palette);
+    decode_info->uncomp_palette.resize(decode_info->max_unique_count);
+    decode_info->comp_motion_indices.resize(decode_info->max_compressed_motion_indices);
+    decode_info->motion_indices.resize(2 * decode_info->num_blocks);
+    //decode_info->comp_ep_Y.resize(decode_info->max_compressed_ep_Y);
+    //decode_info->comp_ep_C.resize(decode_info->max_compressed_ep_C);
 
-    decode_info->wav_ep1_Y = (uint8_t*)(malloc(decode_info->num_blocks));
-    decode_info->wav_ep1_C = (uint8_t*)(malloc(2 * decode_info->num_blocks));
+    decode_info->wav_ep1_Y.resize(decode_info->num_blocks);
+    decode_info->wav_ep1_C.resize(2 * decode_info->num_blocks);
 
-    decode_info->wav_ep2_Y = (uint8_t*)(malloc(decode_info->num_blocks));
-    decode_info->wav_ep2_C = (uint8_t*)(malloc(2 * decode_info->num_blocks));
+    decode_info->wav_ep2_Y.resize(decode_info->num_blocks);
+    decode_info->wav_ep2_C.resize(2 * decode_info->num_blocks);
 
-    decode_info->ep1_Y = (int8_t*)(malloc(decode_info->num_blocks));
-    decode_info->ep2_Y = (int8_t*)(malloc(decode_info->num_blocks));
-    decode_info->ep1_Co = (int8_t*)(malloc(decode_info->num_blocks));
-    decode_info->ep2_Co = (int8_t*)(malloc(decode_info->num_blocks));
-    decode_info->ep1_Cg = (int8_t*)(malloc(decode_info->num_blocks));
-    decode_info->ep2_Cg = (int8_t*)(malloc(decode_info->num_blocks));
+    decode_info->ep1_Y.resize(decode_info->num_blocks);
+    decode_info->ep2_Y.resize(decode_info->num_blocks);
+    decode_info->ep1_Co.resize((decode_info->num_blocks));
+    decode_info->ep2_Co.resize(decode_info->num_blocks);
+    decode_info->ep1_Cg.resize(decode_info->num_blocks);
+    decode_info->ep2_Cg.resize(decode_info->num_blocks);
     decode_info->is_start = false;
 
     if(decode_info->is_multi_thread) {
-      decode_info->comp_ep1_Y = (uint8_t*)(malloc(decode_info->max_compressed_ep_Y));
-      decode_info->comp_ep1_C = (uint8_t*)(malloc(decode_info->max_compressed_ep_C));
-      decode_info->comp_ep2_Y = (uint8_t*)(malloc(decode_info->max_compressed_ep_Y));
-      decode_info->comp_ep2_C = (uint8_t*)(malloc(decode_info->max_compressed_ep_C));
+      decode_info->comp_ep1_Y.resize(decode_info->max_compressed_ep_Y);
+      decode_info->comp_ep1_C.resize(decode_info->max_compressed_ep_C);
+      decode_info->comp_ep2_Y.resize(decode_info->max_compressed_ep_Y);
+      decode_info->comp_ep2_C.resize(decode_info->max_compressed_ep_C);
     }
 
 
@@ -486,10 +520,10 @@ void GetFrameMultiThread(std::ifstream &in_stream,
     decode_info->curr_idx = 0;
     uint32_t compressed_palette_size;
     in_stream.read(reinterpret_cast<char*>(&compressed_palette_size), 4);
-    in_stream.read(reinterpret_cast<char*>(decode_info->comp_palette), compressed_palette_size);
+    in_stream.read(reinterpret_cast<char*>(decode_info->comp_palette.data()), compressed_palette_size);
     uint32_t unique_count;
     in_stream.read(reinterpret_cast<char*>(&unique_count), 4);
-    assert(decode_info->comp_palette != NULL && decode_info->uncomp_palette != NULL);
+    assert(decode_info->comp_palette.data() != NULL && decode_info->uncomp_palette.data() != NULL);
 
     EntropyDecode(decode_info->comp_palette, decode_info->uncomp_palette,
                   compressed_palette_size, unique_count, false);
@@ -500,16 +534,16 @@ void GetFrameMultiThread(std::ifstream &in_stream,
   // Decode a single frame
   uint32_t num_unique;
   in_stream.read(reinterpret_cast<char*>(&num_unique), 4);
-  uint32_t *unique_indices = reinterpret_cast<uint32_t*>(decode_info->uncomp_palette + decode_info->unique_idx_offset);
+  uint32_t *unique_indices = reinterpret_cast<uint32_t*>(decode_info->uncomp_palette.data() + decode_info->unique_idx_offset);
 
   uint32_t comp_motion_indices_sz;
   in_stream.read(reinterpret_cast<char*>(&comp_motion_indices_sz), 4);
-  in_stream.read(reinterpret_cast<char*>(decode_info->comp_motion_indices), comp_motion_indices_sz);
+  in_stream.read(reinterpret_cast<char*>(decode_info->comp_motion_indices.data()), comp_motion_indices_sz);
  
   // Motion Indices Thread
   std::thread motion_decode(EntropyDecode, // Function pointer or Name
-                            decode_info->comp_motion_indices,
-                            decode_info->motion_indices,
+  std::ref(decode_info->comp_motion_indices),
+  std::ref(decode_info->motion_indices),
 		            comp_motion_indices_sz,
                             2 * decode_info->num_blocks,
                             false);
@@ -521,22 +555,22 @@ void GetFrameMultiThread(std::ifstream &in_stream,
   //************************Endpoint 1********************//
   //Endpoint One(1) Thread for Y channel
   in_stream.read(reinterpret_cast<char*>(&comp_Y1_sz), 4);
-  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep1_Y), comp_Y1_sz);
+  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep1_Y.data()), comp_Y1_sz);
 
   std::thread ep1_Y_decode(EntropyDecode,
-                           decode_info->comp_ep1_Y,
-                           decode_info->wav_ep1_Y,
+                           std::ref(decode_info->comp_ep1_Y),
+                           std::ref( decode_info->wav_ep1_Y),
 		           comp_Y1_sz,
 		           decode_info->num_blocks,
                            false);
 
   // Endpoing One(1) Thread for C channel
   in_stream.read(reinterpret_cast<char*>(&comp_C1_sz), 4);
-  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep1_C), comp_C1_sz);
+  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep1_C.data()), comp_C1_sz);
 
   std::thread ep1_C_decode(EntropyDecode,
-                           decode_info->comp_ep1_C,
-                           decode_info->wav_ep1_C,
+  std::ref(decode_info->comp_ep1_C),
+  std::ref(decode_info->wav_ep1_C),
 		           comp_C1_sz,
 		           2 * decode_info->num_blocks,
 		           false);
@@ -548,10 +582,10 @@ void GetFrameMultiThread(std::ifstream &in_stream,
   ///******************Endpoint 2**********//
   // Endpoint Two(2) Thread for Y channel
   in_stream.read(reinterpret_cast<char*>(&comp_Y2_sz), 4);
-  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep2_Y), comp_Y2_sz);
+  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep2_Y.data()), comp_Y2_sz);
   std::thread ep2_Y_decode(EntropyDecode,
-                           decode_info->comp_ep2_Y,
-                           decode_info->wav_ep2_Y,
+  std::ref(decode_info->comp_ep2_Y),
+  std::ref(decode_info->wav_ep2_Y),
 		           comp_Y2_sz,
 		           decode_info->num_blocks,
                            false);
@@ -559,10 +593,10 @@ void GetFrameMultiThread(std::ifstream &in_stream,
 
   //Endpoint Two(2) Thread C channel
   in_stream.read(reinterpret_cast<char*>(&comp_C2_sz), 4);
-  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep2_C), comp_C2_sz);
+  in_stream.read(reinterpret_cast<char*>(decode_info->comp_ep2_C.data()), comp_C2_sz);
   std::thread ep2_C_decode(EntropyDecode,
-                           decode_info->comp_ep2_C,
-                           decode_info->wav_ep2_C,
+  std::ref(decode_info->comp_ep2_C),
+  std::ref(decode_info->wav_ep2_C),
 		           comp_C2_sz,
                            2 * decode_info->num_blocks,
                            false);
@@ -573,7 +607,7 @@ void GetFrameMultiThread(std::ifstream &in_stream,
   else ALOGE("motion decode thread join error!");
 
    std::thread reconstruct_interp(ReconstructDXTFrame,
-      reinterpret_cast<uint32_t*>(decode_info->uncomp_palette + decode_info->unique_idx_offset),
+      reinterpret_cast<uint32_t*>(decode_info->uncomp_palette.data() + decode_info->unique_idx_offset),
       num_unique,
       decode_info,
       prev_dxt,
@@ -593,13 +627,13 @@ void GetFrameMultiThread(std::ifstream &in_stream,
    else std::cout << "ep1 C decode thread join error!" << std::endl;
   
    std::thread reconstruct_ep1(ReconstructEndpoints,
-                               decode_info, 
-			       curr_dxt, 
+                               decode_info,
+			       curr_dxt,
 			       1);
 
    // Wait for ep2 Y and C decoding
    if(ep2_Y_decode.joinable())
-     ep2_Y_decode.join(); 
+     ep2_Y_decode.join();
   else std::cout << "ep2 Y decode thread join error!" << std::endl;
 
    if(ep2_C_decode.joinable())
@@ -617,14 +651,13 @@ void GetFrameMultiThread(std::ifstream &in_stream,
    else std::cout << "reconstruct interp thread join error!" << std::endl;
 
    if(reconstruct_ep1.joinable())
-     reconstruct_ep1.join(); 
+     reconstruct_ep1.join();
    else std::cout << "reconstruct ep1 thread join error!" << std::endl;
- 
+
    if(reconstruct_ep2.joinable())
      reconstruct_ep2.join();
    else std::cout << "reconstruct ep2 thread join error!" << std::endl;
 
-   
    decode_info->unique_idx_offset += 4*num_unique;
    if(decode_info->curr_idx >= decode_info->unique_interval-1) {
      decode_info->curr_idx = 0;

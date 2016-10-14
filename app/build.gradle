@@ -2,6 +2,7 @@ apply plugin: 'com.android.model.application'
 
 model {
 
+
     android {
 
 
@@ -18,19 +19,21 @@ model {
 
     }
 
+
     android.ndk {
         moduleName  = "GenTCjni"
-        cppFlags.addAll(["-std=c++11", "-Wno-error", "-fno-rtti", "-fno-exceptions","-lpthread"])
+        cppFlags.addAll(["-std=c++11", "-Wno-error", "-frtti", "-fexceptions", "-lpthread"])
         cppFlags.addAll(["-I${file("src/main/jni/ObjLoader")}".toString() ])
         cppFlags.addAll(["-I${file("src/main/jni/native_app_glue")}".toString(),
                          "-I${file("src/main/jni/cpufeatures")}".toString(),
                          "-I${file("src/main/jni/ndk_helper")}".toString()])
         CFlags.add("-Werror")
-        ldLibs.addAll(["android", "dl" , "log","GLESv3", "EGL", "OpenMAXAL", "mediandk"])
+        ldLibs.addAll(["android", "dl" , "log","GLESv3", "EGL", "mediandk", "OpenMAXAL"])
 
-        stl         = "gnustl_static"
+        stl         = "gnustl_shared"
 
     }
+
 
     android.sources {
         main {
@@ -42,6 +45,8 @@ model {
             }
         }
     }
+
+
 
     android.buildTypes {
         release {

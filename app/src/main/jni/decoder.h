@@ -61,12 +61,12 @@ typedef struct _DecodeInfo {
 
   bool is_start, is_unique;
 
-  uint8_t *comp_palette, *uncomp_palette;
-  uint8_t *comp_motion_indices, *motion_indices;
-  uint8_t *comp_ep_Y, *comp_ep_C;
-  uint8_t *comp_ep1_Y, *comp_ep1_C, *comp_ep2_Y, *comp_ep2_C;
-  uint8_t *wav_ep1_Y, *wav_ep1_C, *wav_ep2_Y, *wav_ep2_C;
-  int8_t  *ep1_Y, *ep1_Co, *ep1_Cg, *ep2_Y, *ep2_Co, *ep2_Cg;
+  std::vector<uint8_t> comp_palette, uncomp_palette;
+  std::vector<uint8_t> comp_motion_indices, motion_indices;
+  std::vector<uint8_t> comp_ep_Y, comp_ep_C;
+  std::vector<uint8_t> comp_ep1_Y, comp_ep1_C, comp_ep2_Y, comp_ep2_C;
+  std::vector<uint8_t > wav_ep1_Y, wav_ep1_C, wav_ep2_Y, wav_ep2_C;
+  std::vector<int8_t>  ep1_Y, ep1_Co, ep1_Cg, ep2_Y, ep2_Co, ep2_Cg;
   uint32_t num_blocks, unique_idx_offset;
   uint32_t max_unique_count; // The maximum size of the uncompressed dictionary as uint8_t entries
   uint32_t max_compressed_palette, max_compressed_motion_indices;  // a variable to be stored so we can avoid reallocing dictionary
@@ -77,35 +77,11 @@ typedef struct _DecodeInfo {
 
                                      // every time a new unique dictionary has to be read
     _DecodeInfo(){
-     comp_ep1_Y = NULL;
-     comp_palette = NULL; uncomp_palette = NULL;
-     comp_motion_indices = NULL; motion_indices = NULL;
-     comp_ep_Y = NULL; comp_ep_C = NULL;
-     comp_ep1_Y = NULL; comp_ep1_C = NULL; comp_ep2_Y = NULL;
-     comp_ep2_C = NULL;
-     wav_ep1_Y = NULL; wav_ep1_C = NULL; wav_ep2_Y = NULL; wav_ep2_C = NULL;
-     ep1_Y = NULL; ep1_Co = NULL; ep1_Cg = NULL; ep2_Y = NULL; ep2_Co = NULL; ep2_Cg = NULL;
+
      };
     ~_DecodeInfo() {
 
-        if(comp_palette) delete comp_palette;
-        if(uncomp_palette) delete uncomp_palette;
-        if(comp_motion_indices) delete comp_motion_indices;
-        if(motion_indices) delete motion_indices;
-        if(comp_ep1_C) delete comp_ep1_C;
-        if(comp_ep1_Y) delete comp_ep1_Y;
-        if(comp_ep2_C) delete comp_ep2_C;
-        if(comp_ep2_Y) delete comp_ep2_Y;
-        if(comp_ep_C) delete comp_ep_C;
-        if(comp_ep_Y) delete comp_ep_Y;
-        if(wav_ep1_C) delete wav_ep1_C;
-        if(wav_ep2_Y) delete wav_ep2_Y;
-        if(ep1_Y) delete ep1_Y;
-        if(ep1_Co) delete ep1_Co;
-        if(ep1_Cg) delete ep1_Cg;
-        if(ep2_Y) delete ep2_Y;
-        if(ep2_Co) delete ep2_Co;
-        if(ep2_Cg) delete ep2_Cg;
+
     }
 } MPTCDecodeInfo;
 

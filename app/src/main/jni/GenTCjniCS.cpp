@@ -234,7 +234,7 @@ void RendererCS::init(const char * path){
 
 
     //set MPTC file Path
-    m_mptc_file_path = std::string(path) + "/MPTC/multi_test.mpt";
+    m_mptc_file_path = std::string(path) + "/MPTC/mobile_test.mpt";
     ALOGE("MPTC PATH %s\n", m_mptc_file_path.c_str());
     sprintf(m_MpegPath, "%s/360MegaCoaster2K.mp4", path);
 
